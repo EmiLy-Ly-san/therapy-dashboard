@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, TextInput } from 'react-native';
+import { View, Text, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Screen, Card, Button } from '../../../components/ui';
@@ -20,8 +20,21 @@ export default function ItemDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Retour stable vers la library (même si on arrive direct par URL)
+  function handleBackPress() {
+    router.replace('/(patient)/library' as any);
+  }
+
   async function loadItem() {
-    if (!id) return;
+    setErrorMessage('');
+
+    if (!id) {
+      setErrorMessage("ID manquant (impossible d'ouvrir l'item).");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
 
     const { data, error } = await supabase
       .from('items')
@@ -37,36 +50,66 @@ export default function ItemDetailPage() {
 
     setItem(data);
 
-    if (data.type === 'text') {
+    // Si c'est un texte : on prépare les champs d'édition
+    if (data?.type === 'text') {
       setTextValue(data.text_content || '');
       setTitleValue(data.title || '');
+    } else {
+      // Sinon, on vide au cas où (évite de garder un ancien état)
+      setTextValue('');
+      setTitleValue('');
     }
 
     setIsLoading(false);
   }
 
   async function handleSavePress() {
-    if (!id || !item || item.type !== 'text') return;
+    if (!id) {
+      setErrorMessage("ID manquant (impossible d'enregistrer).");
+      return;
+    }
+
+    if (!item || item.type !== 'text') {
+      setErrorMessage("Cet item n'est pas un texte.");
+      return;
+    }
 
     setIsSaving(true);
+    setErrorMessage('');
 
-    await supabase
+    const cleanTitle = titleValue.trim();
+    const cleanText = textValue.trim();
+
+    if (cleanText.length === 0) {
+      setIsSaving(false);
+      setErrorMessage('Le texte ne peut pas être vide.');
+      return;
+    }
+
+    const { error } = await supabase
       .from('items')
       .update({
-        title: titleValue.trim() || null,
-        text_content: textValue.trim(),
+        title: cleanTitle.length > 0 ? cleanTitle : null,
+        text_content: cleanText,
       })
       .eq('id', id);
 
     setIsSaving(false);
-    router.back();
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    // Après sauvegarde, on retourne à la library (plus clair pour l'utilisateur)
+    handleBackPress();
   }
 
   useEffect(() => {
     loadItem();
-  }, []);
+  }, [loadItem]);
 
-  if (isLoading || !item) {
+  if (isLoading) {
     return (
       <Screen centered>
         <Text>Chargement...</Text>
@@ -74,50 +117,94 @@ export default function ItemDetailPage() {
     );
   }
 
-  const isText = item.type === 'text';
-  const isPhoto = item.type === 'photo';
+  if (!item) {
+    return (
+      <Screen centered maxWidth={720}>
+        <Text style={{ color: colors.danger }}>
+          {errorMessage.length > 0 ? errorMessage : 'Item introuvable.'}
+        </Text>
+
+        <View style={{ marginTop: 16 }}>
+          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
+        </View>
+      </Screen>
+    );
+  }
+
+  const typeValue = String(item.type || '');
+  const isText = typeValue === 'text';
+  const isPhoto = typeValue === 'photo';
 
   return (
     <Screen centered maxWidth={720}>
-      <Text
+      {/* HEADER + bouton retour */}
+      <View
         style={{
-          fontSize: 26,
-          fontWeight: '800',
-          color: colors.textPrimary,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
         }}
       >
-        Détail
-      </Text>
+        <Text
+          style={{
+            fontSize: 26,
+            fontWeight: '800',
+            color: colors.textPrimary,
+          }}
+        >
+          Détail
+        </Text>
+
+        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
+      </View>
+
+      {errorMessage.length > 0 ? (
+        <Text style={{ marginTop: 10, color: colors.danger }}>
+          {errorMessage}
+        </Text>
+      ) : null}
 
       {/* PHOTO */}
-      {isPhoto && (
+      {isPhoto ? (
         <PhotoPreview bucket={item.storage_bucket} path={item.storage_path} />
-      )}
+      ) : null}
 
-      {/* TEXTE */}
-      {isText && (
+      {/* TEXTE (édition) */}
+      {isText ? (
         <Card style={{ marginTop: 16 }}>
           <TextInput
-            placeholder="Titre"
+            placeholder="Titre (optionnel)"
             value={titleValue}
             onChangeText={setTitleValue}
-            style={{ marginBottom: 12 }}
+            style={{
+              fontSize: 16,
+              marginBottom: 12,
+              color: colors.textPrimary,
+            }}
           />
 
           <TextInput
             multiline
             value={textValue}
             onChangeText={setTextValue}
-            style={{ minHeight: 200 }}
+            style={{
+              minHeight: 200,
+              fontSize: 16,
+              color: colors.textPrimary,
+              textAlignVertical: 'top',
+            }}
           />
 
-          <Button
-            title={isSaving ? 'Enregistrement...' : 'Enregistrer'}
-            onPress={handleSavePress}
-            isLoading={isSaving}
-          />
+          <View style={{ marginTop: 12 }}>
+            <Button
+              title={isSaving ? 'Enregistrement...' : 'Enregistrer'}
+              onPress={handleSavePress}
+              isLoading={isSaving}
+            />
+          </View>
         </Card>
-      )}
+      ) : null}
 
       {/* NOTES (pour tous les types) */}
       <ItemNotesSection itemId={String(id)} />
