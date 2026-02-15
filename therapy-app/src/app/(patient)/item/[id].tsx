@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Alert,
+  Platform,
+  Pressable,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Screen, Card, Button } from '../../../components/ui';
@@ -18,10 +25,11 @@ export default function ItemDetailPage() {
   const [titleValue, setTitleValue] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Retour stable vers la library (même si on arrive direct par URL)
   function handleBackPress() {
+    // Retour stable vers la library
     router.replace('/(patient)/library' as any);
   }
 
@@ -50,12 +58,10 @@ export default function ItemDetailPage() {
 
     setItem(data);
 
-    // Si c'est un texte : on prépare les champs d'édition
     if (data?.type === 'text') {
       setTextValue(data.text_content || '');
       setTitleValue(data.title || '');
     } else {
-      // Sinon, on vide au cas où (évite de garder un ancien état)
       setTextValue('');
       setTitleValue('');
     }
@@ -101,13 +107,56 @@ export default function ItemDetailPage() {
       return;
     }
 
-    // Après sauvegarde, on retourne à la library (plus clair pour l'utilisateur)
     handleBackPress();
+  }
+
+  async function deleteItem() {
+    if (!id || !item) return;
+
+    try {
+      setIsDeleting(true);
+      setErrorMessage('');
+
+      // 1) supprimer les notes liées à cet item
+      const { error: notesError } = await supabase
+        .from('item_notes')
+        .delete()
+        .eq('item_id', id);
+
+      if (notesError) throw notesError;
+
+      // 2) supprimer le fichier storage s'il existe
+      const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
+      const path = item.storage_path ? String(item.storage_path) : '';
+
+      if (bucket && path) {
+        const { error: storageError } = await supabase.storage
+          .from(bucket)
+          .remove([path]);
+
+        if (storageError) throw storageError;
+      }
+
+      // 3) supprimer l'item
+      const { error: itemError } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', id);
+
+      if (itemError) throw itemError;
+
+      handleBackPress();
+    } catch (e: any) {
+      console.log('DELETE ITEM ERROR', e);
+      setErrorMessage(e?.message ?? JSON.stringify(e));
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   useEffect(() => {
     loadItem();
-  }, [loadItem]);
+  }, [id]);
 
   if (isLoading) {
     return (
@@ -137,7 +186,7 @@ export default function ItemDetailPage() {
 
   return (
     <Screen centered maxWidth={720}>
-      {/* HEADER + bouton retour */}
+      {/* HEADER */}
       <View
         style={{
           flexDirection: 'row',
@@ -147,11 +196,7 @@ export default function ItemDetailPage() {
         }}
       >
         <Text
-          style={{
-            fontSize: 26,
-            fontWeight: '800',
-            color: colors.textPrimary,
-          }}
+          style={{ fontSize: 26, fontWeight: '800', color: colors.textPrimary }}
         >
           Détail
         </Text>
@@ -170,7 +215,7 @@ export default function ItemDetailPage() {
         <PhotoPreview bucket={item.storage_bucket} path={item.storage_path} />
       ) : null}
 
-      {/* TEXTE (édition) */}
+      {/* TEXTE */}
       {isText ? (
         <Card style={{ marginTop: 16 }}>
           <TextInput
@@ -193,6 +238,7 @@ export default function ItemDetailPage() {
               fontSize: 16,
               color: colors.textPrimary,
               textAlignVertical: 'top',
+              paddingTop: 10,
             }}
           />
 
@@ -206,8 +252,31 @@ export default function ItemDetailPage() {
         </Card>
       ) : null}
 
-      {/* NOTES (pour tous les types) */}
+      {/* NOTES */}
       <ItemNotesSection itemId={String(id)} />
+
+      {/* SUPPRIMER ITEM : bouton léger rouge (outline) */}
+      <View style={{ marginTop: 18 }}>
+        <Pressable
+          onPress={deleteItem}
+          disabled={isDeleting}
+          style={{
+            paddingVertical: 12,
+            borderRadius: 12,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colors.danger,
+            backgroundColor: 'transparent',
+            opacity: isDeleting ? 0.6 : 1,
+          }}
+        >
+          <Text
+            style={{ color: colors.danger, fontWeight: '700', fontSize: 14 }}
+          >
+            {isDeleting ? 'Suppression...' : 'Supprimer ce contenu'}
+          </Text>
+        </Pressable>
+      </View>
     </Screen>
   );
 }

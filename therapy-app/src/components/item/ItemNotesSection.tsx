@@ -1,16 +1,15 @@
-/**
- * ItemNotesSection.tsx
- * --------------------
- * Gère :
- * - affichage des notes liées à un item
- * - ajout d'une nouvelle note
- *
- * Utilise la table item_notes
- */
-
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput } from 'react-native';
-import { Button, Card } from '../ui';
+import {
+  View,
+  Text,
+  TextInput,
+  Alert,
+  Pressable,
+  Platform,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+
+import { Card, Button } from '../ui';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../constants';
 
@@ -23,49 +22,137 @@ export default function ItemNotesSection({ itemId }: Props) {
   const [newNote, setNewNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // mode édition
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
   async function loadNotes() {
-    const { data } = await supabase
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return;
+
+    const userId = userData.user.id;
+
+    const { data, error } = await supabase
       .from('item_notes')
-      .select('*')
+      .select('id, note, created_at')
       .eq('item_id', itemId)
+      .eq('patient_id', userId)
       .order('created_at', { ascending: false });
+
+    if (error) {
+      console.log('loadNotes error', error);
+      return;
+    }
 
     setNotes(data || []);
   }
 
   async function handleAddNote() {
-    if (newNote.trim().length === 0) return;
+    const clean = newNote.trim();
+    if (clean.length === 0) return;
 
     setIsSaving(true);
 
-    const { data: userData } = await supabase.auth.getUser();
-
-    if (!userData?.user) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
       setIsSaving(false);
       return;
     }
 
-    await supabase.from('item_notes').insert({
+    const userId = userData.user.id;
+
+    const { error } = await supabase.from('item_notes').insert({
       item_id: itemId,
-      patient_id: userData.user.id,
-      note: newNote.trim(),
+      patient_id: userId,
+      note: clean,
     });
 
-    setNewNote('');
     setIsSaving(false);
+
+    if (error) {
+      Alert.alert('Erreur', error.message);
+      return;
+    }
+
+    setNewNote('');
+    loadNotes();
+  }
+
+  function startEdit(noteRow: any) {
+    setEditingId(String(noteRow.id));
+    setEditingText(noteRow.note ? String(noteRow.note) : '');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingText('');
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+
+    const clean = editingText.trim();
+    if (clean.length === 0) {
+      Alert.alert('Erreur', 'La note ne peut pas être vide.');
+      return;
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return;
+
+    const userId = userData.user.id;
+
+    setIsSaving(true);
+
+    const { error } = await supabase
+      .from('item_notes')
+      .update({ note: clean })
+      .eq('id', editingId)
+      .eq('patient_id', userId);
+
+    setIsSaving(false);
+
+    if (error) {
+      Alert.alert('Erreur', error.message);
+      return;
+    }
+
+    cancelEdit();
+    loadNotes();
+  }
+
+  async function deleteNote(noteId: string) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return;
+
+    const userId = userData.user.id;
+
+    const { error } = await supabase
+      .from('item_notes')
+      .delete()
+      .eq('id', noteId)
+      .eq('patient_id', userId);
+
+    if (error) {
+      Alert.alert('Erreur', error.message);
+      return;
+    }
+
+    if (editingId === noteId) cancelEdit();
+
     loadNotes();
   }
 
   useEffect(() => {
     loadNotes();
-  }, []);
+  }, [itemId]);
 
   return (
     <View style={{ marginTop: 24 }}>
       <Text
         style={{
           fontSize: 18,
-          fontWeight: '700',
+          fontWeight: '800',
           color: colors.textPrimary,
           marginBottom: 12,
         }}
@@ -73,7 +160,7 @@ export default function ItemNotesSection({ itemId }: Props) {
         Notes
       </Text>
 
-      {/* Formulaire */}
+      {/* AJOUT NOTE */}
       <Card>
         <TextInput
           placeholder="Ajouter une note..."
@@ -81,13 +168,15 @@ export default function ItemNotesSection({ itemId }: Props) {
           onChangeText={setNewNote}
           multiline
           style={{
-            minHeight: 80,
+            minHeight: 90,
             textAlignVertical: 'top',
             color: colors.textPrimary,
+            paddingTop: 10,
+            fontSize: 15,
           }}
         />
 
-        <View style={{ marginTop: 10 }}>
+        <View style={{ marginTop: 12 }}>
           <Button
             title={isSaving ? 'Ajout...' : 'Ajouter'}
             onPress={handleAddNote}
@@ -96,13 +185,108 @@ export default function ItemNotesSection({ itemId }: Props) {
         </View>
       </Card>
 
-      {/* Liste */}
+      {/* LISTE NOTES */}
       <View style={{ marginTop: 16, gap: 12 }}>
-        {notes.map((n) => (
-          <Card key={n.id}>
-            <Text style={{ color: colors.textPrimary }}>{n.note}</Text>
-          </Card>
-        ))}
+        {notes.map((n) => {
+          const noteId = String(n.id);
+          const isEditing = editingId === noteId;
+
+          return (
+            <Card key={noteId}>
+              {isEditing ? (
+                <>
+                  <TextInput
+                    value={editingText}
+                    onChangeText={setEditingText}
+                    multiline
+                    style={{
+                      minHeight: 90,
+                      textAlignVertical: 'top',
+                      color: colors.textPrimary,
+                      paddingTop: 10,
+                      fontSize: 15,
+                    }}
+                  />
+
+                  {/* Boutons alignés, propre */}
+                  <View
+                    style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        title={isSaving ? '...' : 'Enregistrer'}
+                        onPress={saveEdit}
+                        isLoading={isSaving}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        title="Annuler"
+                        variant="ghost"
+                        onPress={cancelEdit}
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {/* Ligne du haut : texte + actions (icônes à droite) */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{ color: colors.textPrimary, lineHeight: 20 }}
+                      >
+                        {String(n.note || '')}
+                      </Text>
+                    </View>
+
+                    {/* Actions (icônes) */}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      {/* Modifier */}
+                      <Pressable
+                        onPress={() => startEdit(n)}
+                        style={{
+                          padding: 6,
+                          borderRadius: 999,
+                        }}
+                        hitSlop={8}
+                      >
+                        <Feather
+                          name="edit-3"
+                          size={18}
+                          color={colors.primary}
+                        />
+                      </Pressable>
+
+                      {/* Supprimer (poubelle violette) */}
+                      <Pressable
+                        onPress={() => deleteNote(noteId)}
+                        style={{
+                          padding: 6,
+                          borderRadius: 999,
+                        }}
+                        hitSlop={8}
+                      >
+                        <Feather
+                          name="trash-2"
+                          size={18}
+                          color={colors.primary}
+                        />
+                      </Pressable>
+                    </View>
+                  </View>
+                </>
+              )}
+            </Card>
+          );
+        })}
       </View>
     </View>
   );
