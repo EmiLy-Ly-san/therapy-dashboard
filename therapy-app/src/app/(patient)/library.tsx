@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Text, View, Pressable, ActivityIndicator } from 'react-native';
+import {
+  Text,
+  View,
+  Pressable,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen, Card, Button } from '../../components/ui';
@@ -50,6 +56,35 @@ export default function PatientLibraryPage() {
     setFilterType(nextFilter);
   }
 
+  async function openFileItem(item: any) {
+    setErrorMessage('');
+
+    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
+    const path = item.storage_path ? String(item.storage_path) : '';
+
+    if (!bucket || !path) {
+      setErrorMessage("Ce fichier n'a pas de chemin storage.");
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, 60 * 10); // 10 minutes
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    const url = data?.signedUrl;
+    if (!url) {
+      setErrorMessage("Impossible de générer l'URL.");
+      return;
+    }
+
+    await Linking.openURL(url);
+  }
+
   async function loadItems(reason: 'initial' | 'refresh' = 'refresh') {
     setErrorMessage('');
 
@@ -79,7 +114,9 @@ export default function PatientLibraryPage() {
 
     const { data, error } = await supabase
       .from('items')
-      .select('id, type, title, text_content, created_at')
+      .select(
+        'id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type',
+      )
       .eq('patient_id', userId)
       .order('created_at', { ascending: false });
 
@@ -245,9 +282,13 @@ export default function PatientLibraryPage() {
             return (
               <Card key={String(item.id)}>
                 <Pressable
-                  onPress={() =>
-                    router.push(`/(patient)/item/${item.id}` as any)
-                  }
+                  onPress={() => {
+                    if (typeValue === 'text') {
+                      router.push(`/(patient)/item/${item.id}` as any);
+                    } else {
+                      openFileItem(item);
+                    }
+                  }}
                 >
                   <Text style={{ fontSize: 12, color: colors.textSecondary }}>
                     {getTypeLabel(typeValue)} •{' '}
@@ -273,7 +314,7 @@ export default function PatientLibraryPage() {
                     </Text>
                   ) : (
                     <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-                      (Aperçu fichier à brancher ensuite)
+                      Appuie pour ouvrir le fichier
                     </Text>
                   )}
                 </Pressable>

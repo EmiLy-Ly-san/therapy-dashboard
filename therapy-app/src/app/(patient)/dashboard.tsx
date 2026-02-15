@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Text, View, Switch, Platform } from 'react-native';
+import { Text, View, Switch, Platform, Alert } from 'react-native';
+
 import LogoutButton from '../../components/auth/LogoutButton';
+import { uploadPatientFile } from '../../lib/uploadPatientFile';
 
 import { Screen, Button, Input } from '../../components/ui';
 import { colors } from '../../constants';
@@ -11,8 +13,7 @@ import usePatientDashboardActions from '../../hooks/usePatientDashboardActions';
 export default function PatientDashboardPage() {
   const isWeb = Platform.OS === 'web';
 
-  const { goToWritePage, goToLibraryPage, pickFile } =
-    usePatientDashboardActions();
+  const { goToWritePage, goToLibraryPage } = usePatientDashboardActions();
 
   const [isPrivateModeEnabled, setIsPrivateModeEnabled] = useState(false);
 
@@ -23,6 +24,20 @@ export default function PatientDashboardPage() {
   function handlePrivateModeToggle(nextValue: boolean) {
     setIsPrivateModeEnabled(nextValue);
     console.log('Mode privé:', nextValue ? 'ON' : 'OFF');
+  }
+
+  async function handlePickFile() {
+    try {
+      const res = await uploadPatientFile();
+
+      // si la personne a annulé le picker
+      if (!res.ok && res.reason === 'canceled') return;
+
+      Alert.alert('OK', 'Fichier ajouté ✅');
+    } catch (e: any) {
+      console.log('UPLOAD FAILED', e);
+      Alert.alert('Erreur', e?.message ?? JSON.stringify(e));
+    }
   }
 
   return (
@@ -79,7 +94,7 @@ export default function PatientDashboardPage() {
           title="📎 Ajouter un document"
           description="Photo, audio ou fichier à partager dans ton espace."
         >
-          <Button title="Choisir un fichier" onPress={pickFile} />
+          <Button title="Choisir un fichier" onPress={handlePickFile} />
         </DashboardSectionCard>
 
         {/* PRIVATE MODE */}
@@ -104,6 +119,7 @@ export default function PatientDashboardPage() {
             />
           </View>
         </DashboardSectionCard>
+
         {/* COMPTE */}
         <DashboardSectionCard title="👤 Compte" description="Gérer ma session">
           <LogoutButton redirectTo="/" />
