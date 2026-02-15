@@ -11,3 +11,7 @@ export const colors = {
   primary: '#2F80ED',
   danger: '#EF4444',
 };
+
+export const gradients = {
+  primary: [colors.primary, '#7C3AED'] as const,
+};

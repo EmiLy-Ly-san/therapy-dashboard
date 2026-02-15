@@ -1,13 +1,13 @@
 import { Pressable, Text, ActivityIndicator } from 'react-native';
-import { colors, fontSizes } from '../../constants';
+import { LinearGradient } from 'expo-linear-gradient';
 
-type ButtonVariant = 'primary' | 'danger' | 'ghost';
+import { colors, gradients } from '../../constants/theme';
 
 type ButtonProps = {
   title: string;
-  onPress?: () => void;
+  onPress: () => void;
   isLoading?: boolean;
-  variant?: ButtonVariant;
+  variant?: 'primary' | 'ghost';
 };
 
 export default function Button({
@@ -16,45 +16,58 @@ export default function Button({
   isLoading = false,
   variant = 'primary',
 }: ButtonProps) {
-  const backgroundColor =
-    variant === 'primary'
-      ? colors.primary
-      : variant === 'danger'
-        ? colors.danger
-        : 'transparent';
+  const isPrimary = variant === 'primary';
 
-  const textColor = variant === 'ghost' ? colors.primary : 'white';
-
-  const borderWidth = variant === 'ghost' ? 1 : 0;
-  const borderColor = variant === 'ghost' ? colors.border : 'transparent';
+  if (!isPrimary) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={{
+          paddingVertical: 14,
+          borderRadius: 12,
+          alignItems: 'center',
+        }}
+      >
+        <Text style={{ color: colors.primary, fontWeight: '600' }}>
+          {title}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isLoading}
       style={{
-        backgroundColor,
-        borderWidth,
-        borderColor,
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: 'center',
-        opacity: isLoading ? 0.7 : 1,
+        borderRadius: 14,
+        overflow: 'hidden',
       }}
     >
-      {isLoading ? (
-        <ActivityIndicator />
-      ) : (
-        <Text
-          style={{
-            color: textColor,
-            fontWeight: '700',
-            fontSize: fontSizes.body,
-          }}
-        >
-          {title}
-        </Text>
-      )}
+      <LinearGradient
+        colors={gradients.primary}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{
+          paddingVertical: 16,
+          alignItems: 'center',
+          borderRadius: 14,
+        }}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontWeight: '700',
+              fontSize: 15,
+            }}
+          >
+            {title}
+          </Text>
+        )}
+      </LinearGradient>
     </Pressable>
   );
 }
