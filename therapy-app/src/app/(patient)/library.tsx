@@ -178,6 +178,7 @@ export default function PatientLibraryPage() {
 
       {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
+        {/* Empty state */}
         {visibleItems.length === 0 && !isLoading ? (
           <Card>
             <Text style={{ fontWeight: '800', color: colors.textPrimary }}>
@@ -189,40 +190,47 @@ export default function PatientLibraryPage() {
           </Card>
         ) : null}
 
+        {/* Items */}
         {visibleItems.map((item) => {
           const typeValue = String(item.type || '');
           const titleValue = item.title ? String(item.title) : null;
           const textValue = item.text_content ? String(item.text_content) : '';
           const dateValue = item.created_at ? String(item.created_at) : '';
 
+          function handleOpenItemPress() {
+            router.push(`/(patient)/item/${item.id}` as any);
+          }
+
           return (
             <Card key={String(item.id)}>
-              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                {getTypeLabel(typeValue)} •{' '}
-                {dateValue ? formatDate(dateValue) : ''}
-              </Text>
-
-              <Text
-                style={{
-                  marginTop: 6,
-                  fontWeight: '800',
-                  color: colors.textPrimary,
-                }}
-              >
-                {titleValue || (typeValue === 'text' ? 'Entrée' : 'Document')}
-              </Text>
-
-              {typeValue === 'text' ? (
-                <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-                  {textValue.length > 140
-                    ? `${textValue.slice(0, 140)}…`
-                    : textValue}
+              <Pressable onPress={handleOpenItemPress}>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {getTypeLabel(typeValue)} •{' '}
+                  {dateValue ? formatDate(dateValue) : ''}
                 </Text>
-              ) : (
-                <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-                  (Aperçu fichier à brancher ensuite)
+
+                <Text
+                  style={{
+                    marginTop: 6,
+                    fontWeight: '800',
+                    color: colors.textPrimary,
+                  }}
+                >
+                  {titleValue || (typeValue === 'text' ? 'Entrée' : 'Document')}
                 </Text>
-              )}
+
+                {typeValue === 'text' ? (
+                  <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+                    {textValue.length > 140
+                      ? `${textValue.slice(0, 140)}…`
+                      : textValue}
+                  </Text>
+                ) : (
+                  <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+                    (Aperçu fichier à brancher ensuite)
+                  </Text>
+                )}
+              </Pressable>
             </Card>
           );
         })}
