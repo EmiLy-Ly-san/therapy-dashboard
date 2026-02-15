@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, View, Pressable } from 'react-native';
+import { Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen, Card, Button } from '../../components/ui';
@@ -9,7 +9,6 @@ import { supabase } from '../../lib/supabase';
 type FilterType = 'all' | 'text' | 'files';
 
 function formatDate(isoDate: string) {
-  // isoDate: "2026-02-15T..."
   return isoDate.slice(0, 10);
 }
 
@@ -21,13 +20,27 @@ function getTypeLabel(typeValue: string) {
   return 'Fichier';
 }
 
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+const MIN_LOADER_MS = 500;
+
 export default function PatientLibraryPage() {
   const router = useRouter();
 
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [items, setItems] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // 1) premier chargement de la page
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 2) refresh manuel (bouton)
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // 3) loader "visible" au moins MIN_LOADER_MS
+  const [showLoader, setShowLoader] = useState(true);
 
   function handleBackPress() {
     router.back();
@@ -37,14 +50,27 @@ export default function PatientLibraryPage() {
     setFilterType(nextFilter);
   }
 
-  async function loadItems() {
+  async function loadItems(reason: 'initial' | 'refresh' = 'refresh') {
     setErrorMessage('');
-    setIsLoading(true);
+
+    if (reason === 'initial') {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
+    setShowLoader(true);
+    const startTime = Date.now();
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
     if (userError || !userData?.user) {
+      const elapsed = Date.now() - startTime;
+      await wait(Math.max(0, MIN_LOADER_MS - elapsed));
+
       setIsLoading(false);
+      setIsRefreshing(false);
+      setShowLoader(false);
       setErrorMessage("Tu n'es pas connecté(e).");
       return;
     }
@@ -57,7 +83,12 @@ export default function PatientLibraryPage() {
       .eq('patient_id', userId)
       .order('created_at', { ascending: false });
 
+    const elapsed = Date.now() - startTime;
+    await wait(Math.max(0, MIN_LOADER_MS - elapsed));
+
     setIsLoading(false);
+    setIsRefreshing(false);
+    setShowLoader(false);
 
     if (error) {
       setErrorMessage(error.message);
@@ -68,7 +99,7 @@ export default function PatientLibraryPage() {
   }
 
   useEffect(() => {
-    loadItems();
+    loadItems('initial');
   }, []);
 
   const visibleItems = items.filter((item) => {
@@ -78,8 +109,12 @@ export default function PatientLibraryPage() {
     return typeValue !== 'text';
   });
 
+  const isBusy = isLoading || isRefreshing;
+  const shouldShowLoader = showLoader && isBusy;
+
   return (
     <Screen centered maxWidth={720}>
+      {/* Header */}
       <View
         style={{
           flexDirection: 'row',
@@ -161,12 +196,13 @@ export default function PatientLibraryPage() {
         </Pressable>
       </View>
 
-      {/* Actions */}
+      {/* Action */}
       <View style={{ marginTop: 14 }}>
         <Button
-          title={isLoading ? 'Chargement...' : 'Rafraîchir'}
-          onPress={loadItems}
+          title="Rafraîchir"
+          onPress={() => loadItems('refresh')}
           variant="ghost"
+          disabled={isBusy}
         />
       </View>
 
@@ -176,10 +212,17 @@ export default function PatientLibraryPage() {
         </Text>
       ) : null}
 
+      {/* Loader (un seul) */}
+      {shouldShowLoader ? (
+        <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
+          <ActivityIndicator />
+          <Text style={{ color: colors.textSecondary }}>Chargement…</Text>
+        </View>
+      ) : null}
+
       {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
-        {/* Empty state */}
-        {visibleItems.length === 0 && !isLoading ? (
+        {!shouldShowLoader && visibleItems.length === 0 ? (
           <Card>
             <Text style={{ fontWeight: '800', color: colors.textPrimary }}>
               Rien pour le moment
@@ -190,50 +233,53 @@ export default function PatientLibraryPage() {
           </Card>
         ) : null}
 
-        {/* Items */}
-        {visibleItems.map((item) => {
-          const typeValue = String(item.type || '');
-          const titleValue = item.title ? String(item.title) : null;
-          const textValue = item.text_content ? String(item.text_content) : '';
-          const dateValue = item.created_at ? String(item.created_at) : '';
+        {!shouldShowLoader &&
+          visibleItems.map((item) => {
+            const typeValue = String(item.type || '');
+            const titleValue = item.title ? String(item.title) : null;
+            const textValue = item.text_content
+              ? String(item.text_content)
+              : '';
+            const dateValue = item.created_at ? String(item.created_at) : '';
 
-          function handleOpenItemPress() {
-            router.push(`/(patient)/item/${item.id}` as any);
-          }
-
-          return (
-            <Card key={String(item.id)}>
-              <Pressable onPress={handleOpenItemPress}>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                  {getTypeLabel(typeValue)} •{' '}
-                  {dateValue ? formatDate(dateValue) : ''}
-                </Text>
-
-                <Text
-                  style={{
-                    marginTop: 6,
-                    fontWeight: '800',
-                    color: colors.textPrimary,
-                  }}
+            return (
+              <Card key={String(item.id)}>
+                <Pressable
+                  onPress={() =>
+                    router.push(`/(patient)/item/${item.id}` as any)
+                  }
                 >
-                  {titleValue || (typeValue === 'text' ? 'Entrée' : 'Document')}
-                </Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                    {getTypeLabel(typeValue)} •{' '}
+                    {dateValue ? formatDate(dateValue) : ''}
+                  </Text>
 
-                {typeValue === 'text' ? (
-                  <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-                    {textValue.length > 140
-                      ? `${textValue.slice(0, 140)}…`
-                      : textValue}
+                  <Text
+                    style={{
+                      marginTop: 6,
+                      fontWeight: '800',
+                      color: colors.textPrimary,
+                    }}
+                  >
+                    {titleValue ||
+                      (typeValue === 'text' ? 'Entrée' : 'Document')}
                   </Text>
-                ) : (
-                  <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-                    (Aperçu fichier à brancher ensuite)
-                  </Text>
-                )}
-              </Pressable>
-            </Card>
-          );
-        })}
+
+                  {typeValue === 'text' ? (
+                    <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+                      {textValue.length > 140
+                        ? `${textValue.slice(0, 140)}…`
+                        : textValue}
+                    </Text>
+                  ) : (
+                    <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+                      (Aperçu fichier à brancher ensuite)
+                    </Text>
+                  )}
+                </Pressable>
+              </Card>
+            );
+          })}
       </View>
     </Screen>
   );

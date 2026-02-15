@@ -16,8 +16,18 @@ export default function ItemDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  function handleBackPress() {
+    console.log('Retour depuis modification');
+    router.replace('/(patient)/library' as any);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   async function loadItem() {
-    if (!id) return;
+    if (!id) {
+      setErrorMessage("ID manquant (impossible d'ouvrir l'entrée).");
+      setIsLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('items')
@@ -36,17 +46,29 @@ export default function ItemDetailPage() {
     setIsLoading(false);
   }
 
-  async function handleSave() {
-    if (!id) return;
+  async function handleSavePress() {
+    if (!id) {
+      setErrorMessage("ID manquant (impossible d'enregistrer).");
+      return;
+    }
 
     setIsSaving(true);
     setErrorMessage('');
 
+    const cleanTitle = titleValue.trim();
+    const cleanText = textValue.trim();
+
+    if (cleanText.length === 0) {
+      setIsSaving(false);
+      setErrorMessage('Le texte ne peut pas être vide.');
+      return;
+    }
+
     const { error } = await supabase
       .from('items')
       .update({
-        title: titleValue,
-        text_content: textValue,
+        title: cleanTitle.length > 0 ? cleanTitle : null,
+        text_content: cleanText,
       })
       .eq('id', id);
 
@@ -62,7 +84,7 @@ export default function ItemDetailPage() {
 
   useEffect(() => {
     loadItem();
-  }, []);
+  }, [loadItem]);
 
   if (isLoading) {
     return (
@@ -74,15 +96,27 @@ export default function ItemDetailPage() {
 
   return (
     <Screen centered maxWidth={720}>
-      <Text
-        style={{ fontSize: 26, fontWeight: '800', color: colors.textPrimary }}
+      {/* HEADER avec bouton retour */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+        }}
       >
-        Modifier l’entrée
-      </Text>
+        <Text
+          style={{ fontSize: 26, fontWeight: '800', color: colors.textPrimary }}
+        >
+          Modifier l’entrée
+        </Text>
+
+        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
+      </View>
 
       <Card style={{ marginTop: 16 }}>
         <TextInput
-          placeholder="Titre"
+          placeholder="Titre (optionnel)"
           value={titleValue}
           onChangeText={setTitleValue}
           style={{
@@ -105,18 +139,16 @@ export default function ItemDetailPage() {
         />
       </Card>
 
-      {errorMessage.length > 0 && (
+      {errorMessage.length > 0 ? (
         <Text style={{ marginTop: 10, color: colors.danger }}>
           {errorMessage}
         </Text>
-      )}
+      ) : null}
 
       <View style={{ marginTop: 16 }}>
         <Button
-          title={
-            isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'
-          }
-          onPress={handleSave}
+          title={isSaving ? 'Enregistrement...' : 'Enregistrer'}
+          onPress={handleSavePress}
           isLoading={isSaving}
         />
       </View>

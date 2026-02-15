@@ -13,6 +13,10 @@ export default function WritePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  function handleBackPress() {
+    router.replace('/(patient)/dashboard' as any);
+  }
+
   async function handleSavePress() {
     setErrorMessage('');
 
@@ -57,13 +61,30 @@ export default function WritePage() {
         style={{
           width: '100%',
           maxWidth: Platform.OS === 'web' ? 720 : '100%',
+          alignSelf: 'center',
         }}
       >
-        <Text
-          style={{ fontSize: 28, fontWeight: '800', color: colors.textPrimary }}
+        {/* HEADER avec bouton retour */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
         >
-          Écrire aujourd’hui
-        </Text>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: '800',
+              color: colors.textPrimary,
+            }}
+          >
+            Écrire aujourd’hui
+          </Text>
+
+          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
+        </View>
 
         <Text
           style={{
