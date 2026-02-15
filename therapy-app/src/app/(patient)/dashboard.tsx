@@ -29,6 +29,10 @@ export default function PatientDashboardPage() {
     console.log('Mode privé:', nextValue ? 'ON' : 'OFF');
   }
 
+  function handleGoToLibraryPress() {
+    router.push('/(patient)/library');
+  }
+
   return (
     <Screen>
       <View
@@ -62,7 +66,7 @@ export default function PatientDashboardPage() {
           onChangeText={handleSearchChange}
         />
 
-        {/* WRITE TODAY */}
+        {/* MAIN ACTION */}
         <Card>
           <View style={{ gap: 12 }}>
             <Text
@@ -82,6 +86,30 @@ export default function PatientDashboardPage() {
             <Button
               title="Commencer une entrée"
               onPress={handleWriteTodayPress}
+            />
+          </View>
+        </Card>
+
+        {/* LIBRARY */}
+        <Card>
+          <View style={{ gap: 12 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: colors.textPrimary,
+              }}
+            >
+              📚 Mes contenus
+            </Text>
+
+            <Text style={{ color: colors.textSecondary }}>
+              Retrouve tous tes textes et fichiers au même endroit.
+            </Text>
+
+            <Button
+              title="Voir tous mes contenus"
+              onPress={handleGoToLibraryPress}
             />
           </View>
         </Card>
@@ -132,16 +160,6 @@ export default function PatientDashboardPage() {
             />
           </View>
         </Card>
-
-        {/* OPTIONAL: back to login (debug) */}
-        <Button
-          title="Retour à l’accueil"
-          variant="ghost"
-          onPress={() => {
-            console.log('Retour accueil');
-            router.replace('/(public)' as any);
-          }}
-        />
       </View>
     </Screen>
   );
