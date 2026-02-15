@@ -1,36 +1,27 @@
 import { useState } from 'react';
 import { Text, View, Switch, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
 
-import { Screen, Card, Button, Input } from '../../components/ui';
+import { Screen, Button, Input } from '../../components/ui';
 import { colors } from '../../constants';
 
+import DashboardSectionCard from '../../components/dashboard/DashboardSectionCard';
+import usePatientDashboardActions from '../../hooks/usePatientDashboardActions';
+
 export default function PatientDashboardPage() {
-  const router = useRouter();
+  const isWeb = Platform.OS === 'web';
+
+  const { goToWritePage, goToLibraryPage, pickFile } =
+    usePatientDashboardActions();
 
   const [isPrivateModeEnabled, setIsPrivateModeEnabled] = useState(false);
-
-  const isWeb = Platform.OS === 'web';
 
   function handleSearchChange(textValue: string) {
     console.log('Recherche:', textValue);
   }
 
-  function handleWriteTodayPress() {
-    router.push('/(patient)/write');
-  }
-
-  function handlePickFilePress() {
-    console.log('Choisir un fichier (à faire)');
-  }
-
   function handlePrivateModeToggle(nextValue: boolean) {
     setIsPrivateModeEnabled(nextValue);
     console.log('Mode privé:', nextValue ? 'ON' : 'OFF');
-  }
-
-  function handleGoToLibraryPress() {
-    router.push('/(patient)/library');
   }
 
   return (
@@ -67,76 +58,34 @@ export default function PatientDashboardPage() {
         />
 
         {/* MAIN ACTION */}
-        <Card>
-          <View style={{ gap: 12 }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '700',
-                color: colors.textPrimary,
-              }}
-            >
-              ✍️ Écrire aujourd’hui
-            </Text>
-
-            <Text style={{ color: colors.textSecondary }}>
-              Exprime un ressenti, une pensée ou un souvenir.
-            </Text>
-
-            <Button
-              title="Commencer une entrée"
-              onPress={handleWriteTodayPress}
-            />
-          </View>
-        </Card>
+        <DashboardSectionCard
+          title="✍️ Écrire aujourd’hui"
+          description="Exprime un ressenti, une pensée ou un souvenir."
+        >
+          <Button title="Commencer une entrée" onPress={goToWritePage} />
+        </DashboardSectionCard>
 
         {/* LIBRARY */}
-        <Card>
-          <View style={{ gap: 12 }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '700',
-                color: colors.textPrimary,
-              }}
-            >
-              📚 Mes contenus
-            </Text>
-
-            <Text style={{ color: colors.textSecondary }}>
-              Retrouve tous tes textes et fichiers au même endroit.
-            </Text>
-
-            <Button
-              title="Voir tous mes contenus"
-              onPress={handleGoToLibraryPress}
-            />
-          </View>
-        </Card>
+        <DashboardSectionCard
+          title="📚 Mes contenus"
+          description="Retrouve tous tes textes et fichiers au même endroit."
+        >
+          <Button title="Voir tous mes contenus" onPress={goToLibraryPage} />
+        </DashboardSectionCard>
 
         {/* ADD DOCUMENT */}
-        <Card>
-          <View style={{ gap: 12 }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '700',
-                color: colors.textPrimary,
-              }}
-            >
-              📎 Ajouter un document
-            </Text>
-
-            <Text style={{ color: colors.textSecondary }}>
-              Photo, audio ou fichier à partager dans ton espace.
-            </Text>
-
-            <Button title="Choisir un fichier" onPress={handlePickFilePress} />
-          </View>
-        </Card>
+        <DashboardSectionCard
+          title="📎 Ajouter un document"
+          description="Photo, audio ou fichier à partager dans ton espace."
+        >
+          <Button title="Choisir un fichier" onPress={pickFile} />
+        </DashboardSectionCard>
 
         {/* PRIVATE MODE */}
-        <Card>
+        <DashboardSectionCard
+          title="🔒 Mode privé"
+          description="Visible uniquement par moi"
+        >
           <View
             style={{
               flexDirection: 'row',
@@ -144,22 +93,16 @@ export default function PatientDashboardPage() {
               alignItems: 'center',
             }}
           >
-            <View>
-              <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
-                🔒 Mode privé
-              </Text>
-
-              <Text style={{ marginTop: 4, color: colors.textSecondary }}>
-                Visible uniquement par moi
-              </Text>
-            </View>
+            <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
+              Activer / désactiver
+            </Text>
 
             <Switch
               value={isPrivateModeEnabled}
               onValueChange={handlePrivateModeToggle}
             />
           </View>
-        </Card>
+        </DashboardSectionCard>
       </View>
     </Screen>
   );
