@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Text, View, Switch, Platform } from 'react-native';
+import LogoutButton from '../../components/auth/LogoutButton';
 
 import { Screen, Button, Input } from '../../components/ui';
 import { colors } from '../../constants';
@@ -102,6 +103,10 @@ export default function PatientDashboardPage() {
               onValueChange={handlePrivateModeToggle}
             />
           </View>
+        </DashboardSectionCard>
+        {/* COMPTE */}
+        <DashboardSectionCard title="👤 Compte" description="Gérer ma session">
+          <LogoutButton redirectTo="/" />
         </DashboardSectionCard>
       </View>
     </Screen>
