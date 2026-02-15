@@ -17,7 +17,7 @@ export default function PatientDashboardPage() {
   }
 
   function handleWriteTodayPress() {
-    console.log('Aller vers: écrire aujourd’hui (à faire)');
+    router.push('/(patient)/write');
   }
 
   function handlePickFilePress() {
