@@ -1,82 +1,107 @@
 import { useState } from 'react';
-import { Text, View, Platform, Alert } from 'react-native';
+import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+
 import { Screen, Card, Input, Button } from '../../components/ui';
 import { colors } from '../../constants';
 import { supabase } from '../../lib/supabase';
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [emailValue, setEmailValue] = useState('');
   const [passwordValue, setPasswordValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  async function handleLogin() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  function getRedirectPathFromEmail(email: string) {
+    const emailLowerCase = email.toLowerCase();
+    const userLooksLikeTherapist =
+      emailLowerCase.includes('therapist') || emailLowerCase.includes('psy');
+
+    if (userLooksLikeTherapist) {
+      return '/(therapist)/dashboard';
+    }
+
+    return '/(patient)/dashboard';
+  }
+
+  async function handleLoginButtonPress() {
+    setErrorMessage('');
+
+    const cleanEmail = emailValue.trim();
+
+    if (cleanEmail.length === 0) {
+      setErrorMessage('Merci de mettre un email.');
+      return;
+    }
+
+    if (passwordValue.length === 0) {
+      setErrorMessage('Merci de mettre un mot de passe.');
+      return;
+    }
+
     setIsLoading(true);
 
     const loginResult = await supabase.auth.signInWithPassword({
-      email: emailValue,
+      email: cleanEmail,
       password: passwordValue,
     });
 
     setIsLoading(false);
 
     if (loginResult.error) {
-      Alert.alert('Erreur', loginResult.error.message);
+      setErrorMessage(loginResult.error.message);
+      return;
     }
+
+    const redirectPath = getRedirectPathFromEmail(cleanEmail);
+    router.replace(redirectPath as any);
   }
 
-  // ✅ Sur web/desktop, on limite la largeur
-  const isWeb = Platform.OS === 'web';
-
   return (
-    <Screen style={{ justifyContent: 'center', alignItems: 'center' }}>
-      <View
-        style={{
-          width: '100%',
-          maxWidth: isWeb ? 520 : '100%',
-        }}
+    <Screen centered style={{ justifyContent: 'center' }}>
+      <Text
+        style={{ fontSize: 28, fontWeight: '800', color: colors.textPrimary }}
       >
-        <Text
-          style={{ fontSize: 24, fontWeight: '800', color: colors.textPrimary }}
-        >
-          Connexion
-        </Text>
+        Connexion
+      </Text>
 
-        <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-          Patient ou thérapeute
-        </Text>
+      <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+        Patient ou thérapeute
+      </Text>
 
-        <Card style={{ marginTop: 16 }}>
-          <View style={{ gap: 10 }}>
-            <Input
-              placeholder="Email"
-              autoCapitalize="none"
-              value={emailValue}
-              onChangeText={setEmailValue}
-            />
+      <Card style={{ marginTop: 16 }}>
+        <View style={{ gap: 10 }}>
+          <Input
+            placeholder="Email"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={emailValue}
+            onChangeText={setEmailValue}
+          />
 
-            <Input
-              placeholder="Mot de passe"
-              secureTextEntry
-              value={passwordValue}
-              onChangeText={setPasswordValue}
-            />
+          <Input
+            placeholder="Mot de passe"
+            secureTextEntry
+            value={passwordValue}
+            onChangeText={setPasswordValue}
+          />
 
-            <Button
-              title="Se connecter"
-              onPress={handleLogin}
-              isLoading={isLoading}
-            />
-          </View>
-        </Card>
+          <Button
+            title={isLoading ? 'Connexion...' : 'Se connecter'}
+            onPress={handleLoginButtonPress}
+            isLoading={isLoading}
+          />
 
-        {/* Petit helper demo, discret */}
-        <Text
-          style={{ marginTop: 12, fontSize: 12, color: colors.textSecondary }}
-        >
-          Astuce : un email contenant “therapist” va vers le dashboard
-          thérapeute.
-        </Text>
-      </View>
+          {errorMessage.length > 0 ? (
+            <Text style={{ marginTop: 6, color: colors.danger }}>
+              {errorMessage}
+            </Text>
+          ) : null}
+        </View>
+      </Card>
     </Screen>
   );
 }
