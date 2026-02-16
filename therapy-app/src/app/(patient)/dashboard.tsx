@@ -1,35 +1,130 @@
-import { Text, View } from 'react-native';
+import { useState } from 'react';
+import { Text, View, Switch, Platform, Alert } from 'react-native';
 
-import { Screen, Card, Button } from '../../components/ui';
+import LogoutButton from '../../components/auth/LogoutButton';
+import { uploadPatientFile } from '../../lib/uploadPatientFile';
+
+import { Screen, Button, Input } from '../../components/ui';
 import { colors } from '../../constants';
-import { supabase } from '../../lib/supabase';
+
+import DashboardSectionCard from '../../components/dashboard/DashboardSectionCard';
+import usePatientDashboardActions from '../../hooks/usePatientDashboardActions';
 
 export default function PatientDashboardPage() {
-  async function handleLogoutButtonPress() {
-    await supabase.auth.signOut();
+  const isWeb = Platform.OS === 'web';
+
+  const { goToWritePage, goToLibraryPage } = usePatientDashboardActions();
+
+  const [isPrivateModeEnabled, setIsPrivateModeEnabled] = useState(false);
+
+  function handleSearchChange(textValue: string) {
+    console.log('Recherche:', textValue);
+  }
+
+  function handlePrivateModeToggle(nextValue: boolean) {
+    setIsPrivateModeEnabled(nextValue);
+    console.log('Mode privé:', nextValue ? 'ON' : 'OFF');
+  }
+
+  async function handlePickFile() {
+    try {
+      const res = await uploadPatientFile();
+
+      // si la personne a annulé le picker
+      if (!res.ok && res.reason === 'canceled') return;
+
+      Alert.alert('OK', 'Fichier ajouté ✅');
+    } catch (e: any) {
+      console.log('UPLOAD FAILED', e);
+      Alert.alert('Erreur', e?.message ?? JSON.stringify(e));
+    }
   }
 
   return (
-    <Screen centered>
-      <Text
-        style={{ fontSize: 24, fontWeight: '800', color: colors.textPrimary }}
+    <Screen>
+      <View
+        style={{
+          width: '100%',
+          maxWidth: isWeb ? 720 : '100%',
+          alignSelf: 'center',
+          gap: 24,
+        }}
       >
-        Dashboard Patient
-      </Text>
+        {/* HEADER */}
+        <View>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: '800',
+              color: colors.textPrimary,
+            }}
+          >
+            Dashboard
+          </Text>
 
-      <Card style={{ marginTop: 16 }}>
-        <Text style={{ color: colors.textSecondary }}>
-          (vide pour le moment)
-        </Text>
-
-        <View style={{ marginTop: 12 }}>
-          <Button
-            title="Se déconnecter"
-            onPress={handleLogoutButtonPress}
-            variant="ghost"
-          />
+          <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+            Espace patient
+          </Text>
         </View>
-      </Card>
+
+        {/* SEARCH */}
+        <Input
+          placeholder="Rechercher (notes, fichiers…)"
+          onChangeText={handleSearchChange}
+        />
+
+        {/* MAIN ACTION */}
+        <DashboardSectionCard
+          title="✍️ Écrire aujourd’hui"
+          description="Exprime un ressenti, une pensée ou un souvenir."
+        >
+          <Button title="Commencer une entrée" onPress={goToWritePage} />
+        </DashboardSectionCard>
+
+        {/* LIBRARY */}
+        <DashboardSectionCard
+          title="📚 Mes contenus"
+          description="Retrouve tous tes textes et fichiers au même endroit."
+        >
+          <Button title="Voir tous mes contenus" onPress={goToLibraryPage} />
+        </DashboardSectionCard>
+
+        {/* ADD DOCUMENT */}
+        <DashboardSectionCard
+          title="📎 Ajouter un document"
+          description="Photo, audio ou fichier à partager dans ton espace."
+        >
+          <Button title="Choisir un fichier" onPress={handlePickFile} />
+        </DashboardSectionCard>
+
+        {/* PRIVATE MODE */}
+        <DashboardSectionCard
+          title="🔒 Mode privé"
+          description="Visible uniquement par moi"
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
+              Activer / désactiver
+            </Text>
+
+            <Switch
+              value={isPrivateModeEnabled}
+              onValueChange={handlePrivateModeToggle}
+            />
+          </View>
+        </DashboardSectionCard>
+
+        {/* COMPTE */}
+        <DashboardSectionCard title="👤 Compte" description="Gérer ma session">
+          <LogoutButton redirectTo="/" />
+        </DashboardSectionCard>
+      </View>
     </Screen>
   );
 }
