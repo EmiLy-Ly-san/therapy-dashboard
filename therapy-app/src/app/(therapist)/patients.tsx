@@ -38,7 +38,20 @@ export default function TherapistPatientsPage() {
 
       const { data, error } = await supabase
         .from('therapist_patients')
-        .select('*')
+        .select(
+          `
+            id,
+            patient_id,
+            therapist_id,
+            status,
+            created_at,
+            patient_profile:profiles!therapist_patients_patient_id_fkey (
+              id,
+              display_name,
+              role
+            )
+          `,
+        )
         .eq('therapist_id', therapistId)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
@@ -102,6 +115,13 @@ export default function TherapistPatientsPage() {
             rows.map((r) => {
               const patientId = String(r.patient_id);
 
+              const rawName = r?.patient_profile?.display_name;
+
+              const displayName =
+                typeof rawName === 'string' && rawName.trim().length > 0
+                  ? rawName.trim()
+                  : 'Patient';
+
               return (
                 <Pressable
                   key={String(r.id)}
@@ -117,11 +137,7 @@ export default function TherapistPatientsPage() {
                   <Text
                     style={{ fontWeight: '800', color: colors.textPrimary }}
                   >
-                    Patient
-                  </Text>
-
-                  <Text style={{ marginTop: 4, color: colors.textSecondary }}>
-                    ID : {patientId}
+                    {displayName}
                   </Text>
 
                   <Text style={{ marginTop: 8, color: colors.textSecondary }}>
