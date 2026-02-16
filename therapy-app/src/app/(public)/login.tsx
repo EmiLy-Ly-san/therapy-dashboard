@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 
 import { Screen, Card, Input, Button } from '../../components/ui';
 import { colors } from '../../constants';
@@ -129,57 +130,81 @@ export default function LoginPage() {
 
   return (
     <Screen centered style={{ justifyContent: 'center' }}>
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: '800',
-          color: colors.textPrimary,
-        }}
-      >
-        Connexion
-      </Text>
-
-      <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-        Patient ou thérapeute
-      </Text>
-
-      <Card style={{ marginTop: 16 }}>
+      <View style={{ width: '100%', maxWidth: 520, gap: 18 }}>
+        {/* HEADER (même style que le reste) */}
         <View style={{ gap: 10 }}>
-          <Input
-            placeholder="Email"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={emailValue}
-            onChangeText={setEmailValue}
-            returnKeyType="next"
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#EEF2FF',
+              }}
+            >
+              <Feather name="lock" size={18} color={colors.primary} />
+            </View>
 
-          <Input
-            placeholder="Mot de passe"
-            secureTextEntry
-            value={passwordValue}
-            onChangeText={setPasswordValue}
-            returnKeyType="done"
-            onSubmitEditing={() => {
-              if (!isLoading) {
-                handleLoginButtonPress();
-              }
-            }}
-          />
-
-          <Button
-            title={isLoading ? 'Connexion...' : 'Se connecter'}
-            onPress={handleLoginButtonPress}
-            isLoading={isLoading}
-          />
-
-          {errorMessage.length > 0 ? (
-            <Text style={{ marginTop: 6, color: colors.danger }}>
-              {errorMessage}
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '800',
+                color: colors.textPrimary,
+              }}
+            >
+              Connexion
             </Text>
-          ) : null}
+          </View>
+
+          <Text style={{ marginTop: -4, color: colors.textSecondary }}>
+            Patient ou thérapeute
+          </Text>
         </View>
-      </Card>
+
+        <Card>
+          <View style={{ gap: 10 }}>
+            <Input
+              placeholder="Email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={emailValue}
+              onChangeText={setEmailValue}
+              returnKeyType="next"
+              style={{ fontSize: 12 }}
+            />
+
+            <Input
+              placeholder="Mot de passe"
+              secureTextEntry
+              value={passwordValue}
+              onChangeText={setPasswordValue}
+              returnKeyType="done"
+              style={{ fontSize: 12 }}
+              onSubmitEditing={() => {
+                if (!isLoading) {
+                  handleLoginButtonPress();
+                }
+              }}
+            />
+
+            <View style={{ marginTop: 6 }}>
+              <Button
+                title={isLoading ? 'Connexion...' : 'Se connecter'}
+                onPress={handleLoginButtonPress}
+                isLoading={isLoading}
+              />
+            </View>
+
+            {errorMessage.length > 0 ? (
+              <Text style={{ marginTop: 6, color: colors.danger }}>
+                {errorMessage}
+              </Text>
+            ) : null}
+          </View>
+        </Card>
+      </View>
     </Screen>
   );
 }
