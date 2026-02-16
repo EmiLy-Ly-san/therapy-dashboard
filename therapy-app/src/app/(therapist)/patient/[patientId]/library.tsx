@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Text, View, ActivityIndicator, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 
 import { Screen, Button } from '../../../../components/ui';
 import { colors } from '../../../../constants';
@@ -114,70 +115,91 @@ export default function TherapistPatientLibraryPage() {
   }, [patientId]);
 
   return (
-    <Screen centered maxWidth={720}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Text
-          style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
+    <Screen maxWidth={720}>
+      <View style={{ width: '100%', alignSelf: 'center', gap: 24 }}>
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
         >
-          Contenus partagés
-        </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#EEF2FF',
+              }}
+            >
+              <Feather name="share-2" size={18} color={colors.primary} />
+            </View>
 
-        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-      </View>
-
-      <Text style={{ marginTop: 8, color: colors.textSecondary }}>
-        Contenus partagés par le patient.
-      </Text>
-
-      {errorMessage.length > 0 ? (
-        <Text style={{ marginTop: 12, color: colors.danger }}>
-          {errorMessage}
-        </Text>
-      ) : null}
-
-      {isLoading ? (
-        <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
-          <ActivityIndicator />
-          <Text style={{ color: colors.textSecondary }}>Chargement…</Text>
-        </View>
-      ) : (
-        <View style={{ marginTop: 12, gap: 12 }}>
-          {items.length === 0 ? (
-            <Text style={{ color: colors.textSecondary }}>
-              Aucun contenu partagé pour le moment.
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '800',
+                color: colors.textPrimary,
+              }}
+            >
+              Contenus partagés
             </Text>
-          ) : (
-            items.map((item) => {
-              const typeValue = getTypeValue(item);
+          </View>
 
-              const onPress = () => {
-                if (typeValue === 'text' || typeValue === 'photo') {
-                  router.push(`/(therapist)/item/${item.id}` as any);
-                } else {
-                  openFileItem(item);
-                }
-              };
-
-              return (
-                <LibraryItemCard
-                  key={String(item.id)}
-                  item={item}
-                  thumbUrl={thumbUrls[String(item.id)]}
-                  onPress={onPress}
-                  hidePrivateLabel
-                />
-              );
-            })
-          )}
+          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
         </View>
-      )}
+
+        <Text style={{ marginTop: -8, color: colors.textSecondary }}>
+          Contenus partagés par le patient.
+        </Text>
+
+        {errorMessage.length > 0 ? (
+          <Text style={{ marginTop: 12, color: colors.danger }}>
+            {errorMessage}
+          </Text>
+        ) : null}
+
+        {isLoading ? (
+          <View style={{ marginTop: 8, alignItems: 'center' }}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <View style={{ marginTop: 0, gap: 12 }}>
+            {items.length === 0 ? (
+              <Text style={{ color: colors.textSecondary }}>
+                Aucun contenu partagé pour le moment.
+              </Text>
+            ) : (
+              items.map((item) => {
+                const typeValue = getTypeValue(item);
+
+                const onPress = () => {
+                  if (typeValue === 'text' || typeValue === 'photo') {
+                    router.push(`/(therapist)/item/${item.id}` as any);
+                  } else {
+                    openFileItem(item);
+                  }
+                };
+
+                return (
+                  <LibraryItemCard
+                    key={String(item.id)}
+                    item={item}
+                    thumbUrl={thumbUrls[String(item.id)]}
+                    onPress={onPress}
+                    hidePrivateLabel
+                  />
+                );
+              })
+            )}
+          </View>
+        )}
+      </View>
     </Screen>
   );
 }
