@@ -151,6 +151,7 @@ export default function LoginPage() {
             keyboardType="email-address"
             value={emailValue}
             onChangeText={setEmailValue}
+            returnKeyType="next"
           />
 
           <Input
@@ -158,6 +159,12 @@ export default function LoginPage() {
             secureTextEntry
             value={passwordValue}
             onChangeText={setPasswordValue}
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              if (!isLoading) {
+                handleLoginButtonPress();
+              }
+            }}
           />
 
           <Button
