@@ -6,7 +6,7 @@
  * - Grâce à la RLS : uniquement ceux partagés par le patient
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Text,
   View,
@@ -21,34 +21,37 @@ import { colors } from '../../../../constants';
 import { supabase } from '../../../../lib/supabase';
 
 import LibraryItemCard from '../../../../components/library/LibraryItemCard';
-import {
-  useTherapistPatientItems,
-  TherapistFilterType,
-} from '../../../../hooks/useTherapistPatientItems';
+import { getSignedUrl } from '../../../../lib/storageUrls';
+
+type FilterType = 'all' | 'text' | 'files';
+
+function wait(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const MIN_LOADER_MS = 500;
 
 export default function TherapistPatientLibraryPage() {
   const router = useRouter();
   const { patientId } = useLocalSearchParams();
 
-  const [filterType, setFilterType] = useState<TherapistFilterType>('all');
+  const [filterType, setFilterType] = useState<FilterType>('all');
 
-  const {
-    visibleItems,
-    thumbUrls,
-    errorMessage,
-    isBusy,
-    shouldShowLoader,
-    loadItems,
-  } = useTherapistPatientItems(
-    filterType,
-    patientId ? String(patientId) : null,
-  );
+  const [patientName, setPatientName] = useState<string>('Patient');
+
+  const [items, setItems] = useState<any[]>([]);
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showLoader, setShowLoader] = useState(true);
 
   function handleBackPress() {
-    router.replace('/(therapist)/patients' as any);
+    router.back();
   }
 
-  function handleFilterPress(nextFilter: TherapistFilterType) {
+  function handleFilterPress(nextFilter: FilterType) {
     setFilterType(nextFilter);
   }
 
@@ -65,6 +68,157 @@ export default function TherapistPatientLibraryPage() {
     if (data?.signedUrl) await Linking.openURL(data.signedUrl);
   }
 
+  async function buildThumbs(list: any[]) {
+    const next: Record<string, string> = {};
+
+    for (const it of list) {
+      const typeValue = String(it.type || '');
+      if (typeValue !== 'photo') continue;
+
+      const bucket = it.storage_bucket ? String(it.storage_bucket) : '';
+      const path = it.storage_path ? String(it.storage_path) : '';
+      if (!bucket || !path) continue;
+
+      try {
+        const url = await getSignedUrl(bucket, path, 60 * 10);
+        if (url) next[String(it.id)] = url;
+      } catch (e) {
+        console.log('thumb error', e);
+      }
+    }
+
+    setThumbUrls(next);
+  }
+
+  async function loadPatientName(pid: string) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', pid)
+        .maybeSingle();
+
+      if (error) return;
+
+      const raw = data?.display_name;
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        setPatientName(raw.trim());
+      } else {
+        setPatientName('Patient');
+      }
+    } catch (e) {
+      console.log('LOAD PATIENT NAME ERROR', e);
+    }
+  }
+
+  /**
+   * Charge les items partagés d'un patient pour le therapist connecté
+   * reason = initial (page load) ou refresh (bouton).
+   */
+  async function loadItems(reason: 'initial' | 'refresh' = 'refresh') {
+    setErrorMessage('');
+
+    const pid = patientId ? String(patientId) : '';
+    if (!pid) {
+      setErrorMessage('Patient ID manquant.');
+      setIsLoading(false);
+      setIsRefreshing(false);
+      setShowLoader(false);
+      return;
+    }
+
+    if (reason === 'initial') setIsLoading(true);
+    else setIsRefreshing(true);
+
+    setShowLoader(true);
+    const startTime = Date.now();
+
+    try {
+      // 1) user connecté (therapist)
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !userData?.user) {
+        throw new Error("Tu n'es pas connecté(e).");
+      }
+
+      const therapistId = userData.user.id;
+
+      // 2) nom patient (non bloquant mais on le charge ici au même endroit)
+      await loadPatientName(pid);
+
+      /**
+       * 3) on récupère les items via item_shares
+       * - therapist_id = current therapist
+       * - revoked_at is null
+       * - item.patient_id = patient sélectionné
+       *
+       * On utilise une jointure : item_shares -> items
+       * avec un alias "item:items(...)"
+       */
+      const { data, error } = await supabase
+        .from('item_shares')
+        .select(
+          `
+          id,
+          item_id,
+          therapist_id,
+          shared_at,
+          revoked_at,
+          item:items (
+            id,
+            patient_id,
+            type,
+            title,
+            text_content,
+            created_at,
+            storage_bucket,
+            storage_path,
+            mime_type
+          )
+        `,
+        )
+        .eq('therapist_id', therapistId)
+        .is('revoked_at', null)
+        .eq('item.patient_id', pid)
+        .order('shared_at', { ascending: false });
+
+      if (error) throw error;
+
+      const list = (data ?? []).map((row: any) => row.item).filter(Boolean);
+
+      setItems(list);
+      await buildThumbs(list);
+
+      // Loader min 500ms
+      const elapsed = Date.now() - startTime;
+      await wait(Math.max(0, MIN_LOADER_MS - elapsed));
+    } catch (e: any) {
+      console.log('LOAD SHARED ITEMS ERROR', e);
+
+      const elapsed = Date.now() - startTime;
+      await wait(Math.max(0, MIN_LOADER_MS - elapsed));
+
+      setErrorMessage(e?.message ?? JSON.stringify(e));
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+      setShowLoader(false);
+    }
+  }
+
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      const typeValue = String(item.type || '');
+      if (filterType === 'all') return true;
+      if (filterType === 'text') return typeValue === 'text';
+      return typeValue !== 'text';
+    });
+  }, [items, filterType]);
+
+  const isBusy = isLoading || isRefreshing;
+  const shouldShowLoader = showLoader && isBusy;
+
   useEffect(() => {
     loadItems('initial');
   }, [patientId]);
@@ -79,18 +233,24 @@ export default function TherapistPatientLibraryPage() {
           alignItems: 'center',
         }}
       >
-        <Text
-          style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
-        >
-          Contenus partagés
-        </Text>
+        <View style={{ flex: 1, paddingRight: 10 }}>
+          <Text
+            style={{
+              fontSize: 26,
+              fontWeight: '900',
+              color: colors.textPrimary,
+            }}
+          >
+            Contenus partagés
+          </Text>
+
+          <Text style={{ marginTop: 6, color: colors.textSecondary }}>
+            {patientName}
+          </Text>
+        </View>
 
         <Button title="Retour" variant="ghost" onPress={handleBackPress} />
       </View>
-
-      <Text style={{ marginTop: 8, color: colors.textSecondary }}>
-        Patient : {patientId ? String(patientId) : '-'}
-      </Text>
 
       {/* Filtres */}
       <View
@@ -101,7 +261,7 @@ export default function TherapistPatientLibraryPage() {
           flexWrap: 'wrap',
         }}
       >
-        {(['all', 'text', 'files'] as TherapistFilterType[]).map((ft) => (
+        {(['all', 'text', 'files'] as FilterType[]).map((ft) => (
           <Pressable
             key={ft}
             onPress={() => handleFilterPress(ft)}
@@ -148,13 +308,17 @@ export default function TherapistPatientLibraryPage() {
 
       {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
+        {!shouldShowLoader && visibleItems.length === 0 ? (
+          <Text style={{ color: colors.textSecondary }}>
+            Aucun contenu partagé pour le moment.
+          </Text>
+        ) : null}
+
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
-            const itemId = String(item.id);
 
             const onPress = () => {
-              // texte + photo => page détail therapist (lecture)
               if (typeValue === 'text' || typeValue === 'photo') {
                 router.push(`/(therapist)/item/${item.id}` as any);
               } else {
@@ -164,12 +328,10 @@ export default function TherapistPatientLibraryPage() {
 
             return (
               <LibraryItemCard
-                key={itemId}
+                key={String(item.id)}
                 item={item}
-                thumbUrl={thumbUrls[itemId]}
+                thumbUrl={thumbUrls[String(item.id)]}
                 onPress={onPress}
-                // côté therapist, ce sont des items partagés (RLS)
-                isShared={true}
               />
             );
           })}

@@ -28,6 +28,7 @@ export default function TherapistPatientsPage() {
     try {
       const { data: userData, error: userError } =
         await supabase.auth.getUser();
+
       if (userError || !userData?.user) {
         setErrorMessage("Tu n'es pas connecté(e).");
         setIsLoading(false);
@@ -115,6 +116,7 @@ export default function TherapistPatientsPage() {
             rows.map((r) => {
               const patientId = String(r.patient_id);
 
+              // ✅ Calcul “safe” hors JSX (évite ESLint / Prettier ping-pong)
               const rawName = r?.patient_profile?.display_name;
 
               const displayName =
