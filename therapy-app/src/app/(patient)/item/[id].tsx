@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, Switch } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Switch,
+  ActivityIndicator,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 
 import { Screen, Card, Button } from '../../../components/ui';
 import { colors } from '../../../constants';
@@ -51,7 +59,6 @@ export default function ItemDetailPage() {
     return data?.therapist_id ? String(data.therapist_id) : null;
   }
 
-  // Ajout : recharge état partagé / privé
   async function refreshShareState(itemId: string, tid: string | null) {
     if (!tid) {
       setIsShared(false);
@@ -154,7 +161,7 @@ export default function ItemDetailPage() {
       setTitleValue('');
     }
 
-    // Ajout : charge l’état du partage (non bloquant)
+    //  charge l’état du partage
     try {
       const tid = await fetchTherapistId();
       setTherapistId(tid);
@@ -259,7 +266,7 @@ export default function ItemDetailPage() {
   if (isLoading) {
     return (
       <Screen centered>
-        <Text>Chargement...</Text>
+        <ActivityIndicator />
       </Screen>
     );
   }
@@ -293,11 +300,30 @@ export default function ItemDetailPage() {
           gap: 12,
         }}
       >
-        <Text
-          style={{ fontSize: 26, fontWeight: '800', color: colors.textPrimary }}
-        >
-          Détail
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#EEF2FF',
+            }}
+          >
+            <Feather name="file-text" size={18} color={colors.primary} />
+          </View>
+
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: '800',
+              color: colors.textPrimary,
+            }}
+          >
+            Détail
+          </Text>
+        </View>
 
         <Button title="Retour" variant="ghost" onPress={handleBackPress} />
       </View>
