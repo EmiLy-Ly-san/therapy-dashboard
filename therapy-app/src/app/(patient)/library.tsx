@@ -40,8 +40,6 @@ export default function PatientLibraryPage() {
     isBusy,
     shouldShowLoader,
     loadItems,
-
-    // Ajout : status Partagé/Privé dans la liste
     sharedByItemId,
   } = usePatientItems(filterType);
 
@@ -66,7 +64,6 @@ export default function PatientLibraryPage() {
     if (data?.signedUrl) await Linking.openURL(data.signedUrl);
   }
 
-  // chargement initial
   useEffect(() => {
     loadItems('initial');
   }, []);
@@ -170,8 +167,9 @@ export default function PatientLibraryPage() {
                 item={item}
                 thumbUrl={thumbUrls[itemId]}
                 onPress={onPress}
-                // Ajout : status discret dans la liste
-                isShared={sharedByItemId[itemId] === true}
+                visibilityLabel={
+                  sharedByItemId[itemId] === true ? 'Partagé' : 'Privé'
+                }
               />
             );
           })}
