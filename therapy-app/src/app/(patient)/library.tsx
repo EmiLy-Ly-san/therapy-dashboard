@@ -40,6 +40,9 @@ export default function PatientLibraryPage() {
     isBusy,
     shouldShowLoader,
     loadItems,
+
+    // Ajout : status Partagé/Privé dans la liste
+    sharedByItemId,
   } = usePatientItems(filterType);
 
   function handleBackPress() {
@@ -150,6 +153,7 @@ export default function PatientLibraryPage() {
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
+            const itemId = String(item.id);
 
             const onPress = () => {
               // texte + photo => page détail
@@ -162,10 +166,12 @@ export default function PatientLibraryPage() {
 
             return (
               <LibraryItemCard
-                key={String(item.id)}
+                key={itemId}
                 item={item}
-                thumbUrl={thumbUrls[String(item.id)]}
+                thumbUrl={thumbUrls[itemId]}
                 onPress={onPress}
+                // Ajout : status discret dans la liste
+                isShared={sharedByItemId[itemId] === true}
               />
             );
           })}

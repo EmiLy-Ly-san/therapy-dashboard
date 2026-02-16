@@ -39,6 +39,9 @@ export function usePatientItems(filterType: FilterType) {
   const [isRefreshing, setIsRefreshing] = useState(false); // bouton refresh
   const [showLoader, setShowLoader] = useState(true); // loader min 500ms
 
+  // Ajout : partage (status seulement dans la liste)
+  const [therapistId, setTherapistId] = useState<string | null>(null);
+
   /**
    * Génère les miniatures pour les items de type "photo".
    * On crée une signedUrl pour chaque photo.
@@ -65,6 +68,35 @@ export function usePatientItems(filterType: FilterType) {
     }
 
     setThumbUrls(next);
+  }
+
+  // Ajout : récupère le therapist_id lié au patient (si existe)
+  async function fetchTherapistIdForPatient(patientId: string) {
+    const { data, error } = await supabase
+      .from('therapist_patients')
+      .select('therapist_id')
+      .eq('patient_id', patientId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const tid = data?.therapist_id ? String(data.therapist_id) : null;
+    setTherapistId(tid);
+    return tid;
+  }
+
+  // Ajout : calcule "partagé ou non" à partir des item_shares (si on a therapist_id)
+  function computeIsShared(item: any, tid: string | null) {
+    if (!tid) return false;
+    const shares = item?.item_shares;
+    if (!Array.isArray(shares)) return false;
+
+    return shares.some(
+      (s: any) => String(s.therapist_id) === tid && s.revoked_at == null,
+    );
   }
 
   /**
@@ -98,11 +130,26 @@ export function usePatientItems(filterType: FilterType) {
 
     const userId = userData.user.id;
 
+    // Ajout : récupère therapist_id si pas déjà connu (non bloquant)
+    try {
+      if (!therapistId) await fetchTherapistIdForPatient(userId);
+    } catch (e) {
+      console.log('fetch therapist id error', e);
+      // On continue quand même : la liste marche sans statut de partage
+    }
+
     // 3) Requête Supabase : on récupère les champs utiles
+    // + Ajout : item_shares (pour calculer le status Privé/Partagé en liste)
     const { data, error } = await supabase
       .from('items')
       .select(
-        'id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type',
+        `
+        id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type,
+        item_shares (
+          therapist_id,
+          revoked_at
+        )
+      `,
       )
       .eq('patient_id', userId)
       .order('created_at', { ascending: false });
@@ -140,6 +187,15 @@ export function usePatientItems(filterType: FilterType) {
     });
   }, [items, filterType]);
 
+  // Ajout : Map { [itemId]: boolean } pour afficher Privé/Partagé dans la liste
+  const sharedByItemId = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const it of items) {
+      map[String(it.id)] = computeIsShared(it, therapistId);
+    }
+    return map;
+  }, [items, therapistId]);
+
   // “busy” = loader en cours
   const isBusy = isLoading || isRefreshing;
 
@@ -156,5 +212,9 @@ export function usePatientItems(filterType: FilterType) {
     isBusy,
     shouldShowLoader,
     loadItems,
+
+    // Ajout : status Privé/Partagé
+    therapistId,
+    sharedByItemId,
   };
 }

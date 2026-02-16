@@ -29,9 +29,17 @@ type Props = {
   item: any;
   thumbUrl?: string;
   onPress: () => void;
+
+  // Ajout : status discret
+  isShared?: boolean;
 };
 
-export default function LibraryItemCard({ item, thumbUrl, onPress }: Props) {
+export default function LibraryItemCard({
+  item,
+  thumbUrl,
+  onPress,
+  isShared = false,
+}: Props) {
   const typeValue = String(item.type || '');
   const titleValue = item.title ? String(item.title) : null;
   const textValue = item.text_content ? String(item.text_content) : '';
@@ -40,9 +48,35 @@ export default function LibraryItemCard({ item, thumbUrl, onPress }: Props) {
   return (
     <Card>
       <Pressable onPress={onPress}>
-        <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-          {getTypeLabel(typeValue)} • {dateValue ? formatDate(dateValue) : ''}
-        </Text>
+        {/* Ligne info + status discret */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+            {getTypeLabel(typeValue)} • {dateValue ? formatDate(dateValue) : ''}
+          </Text>
+
+          {/* Status discret (petite police) */}
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: 'transparent',
+            }}
+          >
+            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+              {isShared ? 'Partagé' : 'Privé'}
+            </Text>
+          </View>
+        </View>
 
         <Text
           style={{

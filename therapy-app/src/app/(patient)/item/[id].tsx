@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Alert,
-  Platform,
-  Pressable,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, Switch } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Screen, Card, Button } from '../../../components/ui';
@@ -28,9 +21,104 @@ export default function ItemDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Ajout : toggle Partager avec le thérapeute
+  const [therapistId, setTherapistId] = useState<string | null>(null);
+  const [isShared, setIsShared] = useState(false);
+  const [isTogglingShare, setIsTogglingShare] = useState(false);
+
   function handleBackPress() {
     // Retour stable vers la library
     router.replace('/(patient)/library' as any);
+  }
+
+  // Ajout : récupère therapist_id actif
+  async function fetchTherapistId() {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return null;
+
+    const userId = userData.user.id;
+
+    const { data, error } = await supabase
+      .from('therapist_patients')
+      .select('therapist_id')
+      .eq('patient_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.therapist_id ? String(data.therapist_id) : null;
+  }
+
+  // Ajout : recharge état partagé / privé
+  async function refreshShareState(itemId: string, tid: string | null) {
+    if (!tid) {
+      setIsShared(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('item_shares')
+      .select('id')
+      .eq('item_id', itemId)
+      .eq('therapist_id', tid)
+      .is('revoked_at', null)
+      .limit(1);
+
+    if (error) throw error;
+    setIsShared((data ?? []).length > 0);
+  }
+
+  // Ajout : applique la valeur du toggle
+  async function setShareEnabled(itemId: string, enabled: boolean) {
+    setIsTogglingShare(true);
+    setErrorMessage('');
+
+    try {
+      let tid = therapistId;
+      if (!tid) {
+        tid = await fetchTherapistId();
+        setTherapistId(tid);
+      }
+
+      if (!tid) {
+        setErrorMessage("Aucun thérapeute actif n'est lié à ce patient.");
+        // On remet l’état UI cohérent
+        setIsShared(false);
+        return;
+      }
+
+      if (enabled) {
+        const { error } = await supabase.from('item_shares').upsert(
+          {
+            item_id: itemId,
+            therapist_id: tid,
+            shared_at: new Date().toISOString(),
+            revoked_at: null,
+          },
+          { onConflict: 'item_id,therapist_id' },
+        );
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('item_shares')
+          .update({ revoked_at: new Date().toISOString() })
+          .eq('item_id', itemId)
+          .eq('therapist_id', tid)
+          .is('revoked_at', null);
+
+        if (error) throw error;
+      }
+
+      await refreshShareState(itemId, tid);
+    } catch (e: any) {
+      console.log('TOGGLE SHARE DETAIL ERROR', e);
+      setErrorMessage(e?.message ?? JSON.stringify(e));
+    } finally {
+      setIsTogglingShare(false);
+    }
   }
 
   async function loadItem() {
@@ -64,6 +152,15 @@ export default function ItemDetailPage() {
     } else {
       setTextValue('');
       setTitleValue('');
+    }
+
+    // Ajout : charge l’état du partage (non bloquant)
+    try {
+      const tid = await fetchTherapistId();
+      setTherapistId(tid);
+      await refreshShareState(String(id), tid);
+    } catch (e) {
+      console.log('share state load error', e);
     }
 
     setIsLoading(false);
@@ -138,6 +235,7 @@ export default function ItemDetailPage() {
       }
 
       // 3) supprimer l'item
+      // (avec ON DELETE CASCADE côté DB, item_shares sera supprimé automatiquement)
       const { error: itemError } = await supabase
         .from('items')
         .delete()
@@ -209,6 +307,43 @@ export default function ItemDetailPage() {
           {errorMessage}
         </Text>
       ) : null}
+
+      {/* Ajout : Toggle partage (dans le détail seulement) */}
+      <View
+        style={{
+          marginTop: 14,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+          paddingVertical: 10,
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: '800', color: colors.textPrimary }}>
+            Partager avec mon thérapeute
+          </Text>
+          <Text
+            style={{ marginTop: 4, fontSize: 12, color: colors.textSecondary }}
+          >
+            {therapistId
+              ? 'Votre thérapeute pourra voir cet item.'
+              : "Aucun thérapeute n'est lié pour le moment."}
+          </Text>
+        </View>
+
+        <Switch
+          value={isShared}
+          onValueChange={(v) => {
+            if (!id) return;
+            setIsShared(v); // feedback immédiat
+            setShareEnabled(String(id), v);
+          }}
+          disabled={isTogglingShare || !id}
+        />
+      </View>
 
       {/* PHOTO */}
       {isPhoto ? (
