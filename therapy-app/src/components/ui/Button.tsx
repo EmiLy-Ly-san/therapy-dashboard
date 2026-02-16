@@ -26,8 +26,8 @@ export default function Button({
       <Pressable
         onPress={isDisabled ? undefined : onPress}
         style={{
-          paddingVertical: 14,
-          borderRadius: 12,
+          paddingVertical: 10,
+          borderRadius: 8,
           alignItems: 'center',
           opacity: isDisabled ? 0.55 : 1,
         }}
@@ -35,7 +35,13 @@ export default function Button({
         {isLoading ? (
           <ActivityIndicator />
         ) : (
-          <Text style={{ color: colors.primary, fontWeight: '600' }}>
+          <Text
+            style={{
+              color: colors.primary,
+              fontWeight: '600',
+              fontSize: 14,
+            }}
+          >
             {title}
           </Text>
         )}
@@ -43,7 +49,6 @@ export default function Button({
     );
   }
 
-  // 2) PRIMARY ou DANGER = bouton plein
   const isDanger = variant === 'danger';
 
   return (
@@ -51,7 +56,7 @@ export default function Button({
       onPress={isDisabled ? undefined : onPress}
       disabled={isDisabled}
       style={{
-        borderRadius: 14,
+        borderRadius: 10,
         overflow: 'hidden',
         opacity: isDisabled ? 0.75 : 1,
       }}
@@ -60,9 +65,10 @@ export default function Button({
         // DANGER = fond rouge
         <Pressable
           style={{
-            paddingVertical: 16,
+            paddingVertical: 12,
+            paddingHorizontal: 18,
             alignItems: 'center',
-            borderRadius: 14,
+            borderRadius: 10,
             backgroundColor: colors.danger,
           }}
         >
@@ -72,8 +78,8 @@ export default function Button({
             <Text
               style={{
                 color: '#FFFFFF',
-                fontWeight: '700',
-                fontSize: 15,
+                fontWeight: '600',
+                fontSize: 14,
               }}
             >
               {title}
@@ -87,9 +93,10 @@ export default function Button({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={{
-            paddingVertical: 16,
+            paddingVertical: 12,
+            paddingHorizontal: 18,
             alignItems: 'center',
-            borderRadius: 14,
+            borderRadius: 10,
           }}
         >
           {isLoading ? (
@@ -98,8 +105,8 @@ export default function Button({
             <Text
               style={{
                 color: '#FFFFFF',
-                fontWeight: '700',
-                fontSize: 15,
+                fontWeight: '600',
+                fontSize: 12,
               }}
             >
               {title}

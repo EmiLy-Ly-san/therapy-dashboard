@@ -65,20 +65,17 @@ export default function PatientDashboardPage() {
         }}
       >
         {/* HEADER */}
-        <View style={{ gap: 10 }}>
-          {/* LOGO */}
-          <View style={{ alignItems: 'flex-start' }}>
-            <Image
-              source={require('../../assets/images/therapy-dashboard-little.svg')}
-              style={{ width: 160, height: 40 }}
-              resizeMode="contain"
-            />
-          </View>
+        <View style={{ gap: 16 }}>
+          <Image
+            source={require('../../assets/images/therapy-dashboard-little.svg')}
+            style={{ width: 180, height: 42 }}
+            resizeMode="contain"
+          />
 
           <Text
             style={{
-              fontSize: 16,
-              fontWeight: '800',
+              fontSize: 18,
+              fontWeight: '500',
               color: colors.textPrimary,
             }}
           >
@@ -88,31 +85,41 @@ export default function PatientDashboardPage() {
 
         <Input
           placeholder="Rechercher (notes, fichiers…)"
+          style={{
+            fontSize: 12,
+          }}
           onChangeText={handleSearchChange}
         />
 
         <DashboardSectionCard
-          title="✍️ Écrire aujourd’hui"
+          iconName="edit-3"
+          title="Écrire aujourd’hui"
           description="Exprime un ressenti, une pensée ou un souvenir."
         >
           <Button title="Commencer une entrée" onPress={goToWritePage} />
         </DashboardSectionCard>
 
         <DashboardSectionCard
-          title="📎 Ajouter un document"
+          iconName="paperclip"
+          title="Ajouter un document"
           description="Photo, audio ou fichier à partager dans ton espace."
         >
           <Button title="Choisir un fichier" onPress={handlePickFile} />
         </DashboardSectionCard>
 
         <DashboardSectionCard
-          title="📚 Mes contenus"
+          iconName="book-open"
+          title="Mes contenus"
           description="Retrouve tous tes textes et fichiers au même endroit."
         >
           <Button title="Voir tous mes contenus" onPress={goToLibraryPage} />
         </DashboardSectionCard>
 
-        <DashboardSectionCard title="👤 Compte" description="Gérer ma session">
+        <DashboardSectionCard
+          iconName="user"
+          title="Compte"
+          description="Gérer ma session"
+        >
           <LogoutButton redirectTo="/" />
         </DashboardSectionCard>
       </View>
