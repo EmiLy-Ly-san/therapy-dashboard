@@ -6,6 +6,7 @@
  * - Afficher un extrait si texte
  * - Afficher une miniature si photo (si on l'a)
  * - Gérer le clic (fourni par le parent)
+ * - Afficher un label discret (Privé / Partagé)
  */
 
 import { View, Text, Pressable, Image } from 'react-native';
@@ -45,13 +46,32 @@ export default function LibraryItemCard({
   const textValue = item.text_content ? String(item.text_content) : '';
   const dateValue = item.created_at ? String(item.created_at) : '';
 
+  const lowerLabel = visibilityLabel?.toLowerCase();
+
   const shouldShowVisibility =
-    !!visibilityLabel &&
-    !(hidePrivateLabel && visibilityLabel.toLowerCase() === 'privé');
+    !!visibilityLabel && !(hidePrivateLabel && lowerLabel === 'privé');
+
+  // 🎨 Couleurs dynamiques selon statut
+  let badgeBackground = colors.cardBackground;
+  let badgeBorder = colors.border;
+  let badgeText = colors.textSecondary;
+
+  if (lowerLabel === 'partagé') {
+    badgeBackground = '#E6F6EE'; // vert très léger
+    badgeBorder = '#A7E3C7';
+    badgeText = '#15803D'; // vert soutenu
+  }
+
+  if (lowerLabel === 'privé') {
+    badgeBackground = '#FFF7E6'; // jaune doux
+    badgeBorder = '#F5D7A1';
+    badgeText = '#B45309'; // orangé/or
+  }
 
   return (
     <Card>
       <Pressable onPress={onPress}>
+        {/* Ligne meta */}
         <View
           style={{
             flexDirection: 'row',
@@ -71,15 +91,15 @@ export default function LibraryItemCard({
                 paddingVertical: 4,
                 borderRadius: 999,
                 borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.cardBackground,
+                borderColor: badgeBorder,
+                backgroundColor: badgeBackground,
               }}
             >
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '700',
-                  color: colors.textSecondary,
+                  fontWeight: '800',
+                  color: badgeText,
                 }}
               >
                 {visibilityLabel}
@@ -98,14 +118,14 @@ export default function LibraryItemCard({
           {titleValue || (typeValue === 'text' ? 'Entrée' : 'Document')}
         </Text>
 
-        {/* TEXTE : extrait */}
+        {/* TEXTE */}
         {typeValue === 'text' ? (
           <Text style={{ marginTop: 6, color: colors.textSecondary }}>
             {textValue.length > 140 ? `${textValue.slice(0, 140)}…` : textValue}
           </Text>
         ) : null}
 
-        {/* PHOTO : miniature */}
+        {/* PHOTO */}
         {typeValue === 'photo' ? (
           <View style={{ marginTop: 10 }}>
             {thumbUrl ? (
