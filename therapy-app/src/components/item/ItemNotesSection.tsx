@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Alert,
-  Pressable,
-  Platform,
-} from 'react-native';
+import { View, Text, TextInput, Alert, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { Card, Button } from '../ui';
@@ -151,8 +144,8 @@ export default function ItemNotesSection({ itemId }: Props) {
     <View style={{ marginTop: 24 }}>
       <Text
         style={{
-          fontSize: 18,
-          fontWeight: '800',
+          fontSize: 16,
+          fontWeight: '600',
           color: colors.textPrimary,
           marginBottom: 12,
         }}
@@ -170,9 +163,9 @@ export default function ItemNotesSection({ itemId }: Props) {
           style={{
             minHeight: 90,
             textAlignVertical: 'top',
-            color: colors.textPrimary,
+            color: colors.textSecondary,
             paddingTop: 10,
-            fontSize: 15,
+            fontSize: 12,
           }}
         />
 

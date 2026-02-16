@@ -20,6 +20,7 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
@@ -69,25 +70,45 @@ export default function PatientLibraryPage() {
   }, []);
 
   return (
-    <Screen centered maxWidth={720}>
+    <Screen maxWidth={720}>
       {/* Header */}
       <View
         style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: 12,
         }}
       >
-        <Text
-          style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
-        >
-          Mes contenus
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#EEF2FF',
+            }}
+          >
+            <Feather name="book-open" size={18} color={colors.primary} />
+          </View>
+
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: '800',
+              color: colors.textPrimary,
+            }}
+          >
+            Mes contenus
+          </Text>
+        </View>
 
         <Button title="Retour" variant="ghost" onPress={handleBackPress} />
       </View>
 
-      <Text style={{ marginTop: 8, color: colors.textSecondary }}>
+      <Text style={{ marginTop: 6, color: colors.textSecondary }}>
         Tous tes textes et fichiers, au même endroit.
       </Text>
 
@@ -139,9 +160,8 @@ export default function PatientLibraryPage() {
 
       {/* Loader */}
       {shouldShowLoader ? (
-        <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
+        <View style={{ marginTop: 24, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
-          <Text style={{ color: colors.textSecondary }}>Chargement…</Text>
         </View>
       ) : null}
 
@@ -153,7 +173,6 @@ export default function PatientLibraryPage() {
             const itemId = String(item.id);
 
             const onPress = () => {
-              // texte + photo => page détail
               if (typeValue === 'text' || typeValue === 'photo') {
                 router.push(`/(patient)/item/${item.id}` as any);
               } else {
