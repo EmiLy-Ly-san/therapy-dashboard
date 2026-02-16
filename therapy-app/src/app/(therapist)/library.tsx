@@ -1,14 +1,8 @@
 /**
- * library.tsx
- * -----------
- * Page UI (simple) :
- * - Affiche le header
- * - Affiche les filtres
- * - Affiche le bouton refresh
- * - Affiche la liste
- *
- * Toute la logique data est dans usePatientItems()
- * et l'affichage 1 item est dans LibraryItemCard.
+ * library.tsx (therapist)
+ * -----------------------
+ * - Liste des contenus visibles par le thérapeute
+ * - Grâce à la RLS : uniquement ceux partagés par les patients
  */
 
 import { useEffect, useState } from 'react';
@@ -26,12 +20,15 @@ import { colors } from '../../constants';
 import { supabase } from '../../lib/supabase';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
-import { usePatientItems, FilterType } from '../../hooks/usePatientItems';
+import {
+  useTherapistItems,
+  TherapistFilterType,
+} from '../../hooks/useTherapistItems';
 
-export default function PatientLibraryPage() {
+export default function TherapistLibraryPage() {
   const router = useRouter();
 
-  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterType, setFilterType] = useState<TherapistFilterType>('all');
 
   const {
     visibleItems,
@@ -40,16 +37,13 @@ export default function PatientLibraryPage() {
     isBusy,
     shouldShowLoader,
     loadItems,
-
-    // Ajout : status Partagé/Privé dans la liste
-    sharedByItemId,
-  } = usePatientItems(filterType);
+  } = useTherapistItems(filterType);
 
   function handleBackPress() {
     router.back();
   }
 
-  function handleFilterPress(nextFilter: FilterType) {
+  function handleFilterPress(nextFilter: TherapistFilterType) {
     setFilterType(nextFilter);
   }
 
@@ -66,7 +60,6 @@ export default function PatientLibraryPage() {
     if (data?.signedUrl) await Linking.openURL(data.signedUrl);
   }
 
-  // chargement initial
   useEffect(() => {
     loadItems('initial');
   }, []);
@@ -84,14 +77,14 @@ export default function PatientLibraryPage() {
         <Text
           style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
         >
-          Mes contenus
+          Contenus partagés
         </Text>
 
         <Button title="Retour" variant="ghost" onPress={handleBackPress} />
       </View>
 
       <Text style={{ marginTop: 8, color: colors.textSecondary }}>
-        Tous tes textes et fichiers, au même endroit.
+        Uniquement les contenus partagés par les patients.
       </Text>
 
       {/* Filtres */}
@@ -103,7 +96,7 @@ export default function PatientLibraryPage() {
           flexWrap: 'wrap',
         }}
       >
-        {(['all', 'text', 'files'] as FilterType[]).map((ft) => (
+        {(['all', 'text', 'files'] as TherapistFilterType[]).map((ft) => (
           <Pressable
             key={ft}
             onPress={() => handleFilterPress(ft)}
@@ -156,9 +149,9 @@ export default function PatientLibraryPage() {
             const itemId = String(item.id);
 
             const onPress = () => {
-              // texte + photo => page détail
+              // texte + photo => page détail therapist (lecture)
               if (typeValue === 'text' || typeValue === 'photo') {
-                router.push(`/(patient)/item/${item.id}` as any);
+                router.push(`/(therapist)/item/${item.id}` as any);
               } else {
                 openFileItem(item);
               }
@@ -170,8 +163,8 @@ export default function PatientLibraryPage() {
                 item={item}
                 thumbUrl={thumbUrls[itemId]}
                 onPress={onPress}
-                // Ajout : status discret dans la liste
-                isShared={sharedByItemId[itemId] === true}
+                // côté therapist, c’est forcément partagé (vu via RLS)
+                isShared={true}
               />
             );
           })}

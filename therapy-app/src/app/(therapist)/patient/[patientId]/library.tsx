@@ -1,14 +1,9 @@
 /**
- * library.tsx
- * -----------
- * Page UI (simple) :
- * - Affiche le header
- * - Affiche les filtres
- * - Affiche le bouton refresh
- * - Affiche la liste
- *
- * Toute la logique data est dans usePatientItems()
- * et l'affichage 1 item est dans LibraryItemCard.
+ * library.tsx (therapist → patient)
+ * ---------------------------------
+ * - Liste des contenus partagés par un patient donné
+ * - Le thérapeute doit sélectionner un patient avant d’accéder à la liste
+ * - Grâce à la RLS : uniquement ceux partagés par le patient
  */
 
 import { useEffect, useState } from 'react';
@@ -19,19 +14,23 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { Screen, Button } from '../../components/ui';
-import { colors } from '../../constants';
-import { supabase } from '../../lib/supabase';
+import { Screen, Button } from '../../../../components/ui';
+import { colors } from '../../../../constants';
+import { supabase } from '../../../../lib/supabase';
 
-import LibraryItemCard from '../../components/library/LibraryItemCard';
-import { usePatientItems, FilterType } from '../../hooks/usePatientItems';
+import LibraryItemCard from '../../../../components/library/LibraryItemCard';
+import {
+  useTherapistPatientItems,
+  TherapistFilterType,
+} from '../../../../hooks/useTherapistPatientItems';
 
-export default function PatientLibraryPage() {
+export default function TherapistPatientLibraryPage() {
   const router = useRouter();
+  const { patientId } = useLocalSearchParams();
 
-  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterType, setFilterType] = useState<TherapistFilterType>('all');
 
   const {
     visibleItems,
@@ -40,16 +39,16 @@ export default function PatientLibraryPage() {
     isBusy,
     shouldShowLoader,
     loadItems,
-
-    // Ajout : status Partagé/Privé dans la liste
-    sharedByItemId,
-  } = usePatientItems(filterType);
+  } = useTherapistPatientItems(
+    filterType,
+    patientId ? String(patientId) : null,
+  );
 
   function handleBackPress() {
-    router.back();
+    router.replace('/(therapist)/patients' as any);
   }
 
-  function handleFilterPress(nextFilter: FilterType) {
+  function handleFilterPress(nextFilter: TherapistFilterType) {
     setFilterType(nextFilter);
   }
 
@@ -66,10 +65,9 @@ export default function PatientLibraryPage() {
     if (data?.signedUrl) await Linking.openURL(data.signedUrl);
   }
 
-  // chargement initial
   useEffect(() => {
     loadItems('initial');
-  }, []);
+  }, [patientId]);
 
   return (
     <Screen centered maxWidth={720}>
@@ -84,14 +82,14 @@ export default function PatientLibraryPage() {
         <Text
           style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
         >
-          Mes contenus
+          Contenus partagés
         </Text>
 
         <Button title="Retour" variant="ghost" onPress={handleBackPress} />
       </View>
 
       <Text style={{ marginTop: 8, color: colors.textSecondary }}>
-        Tous tes textes et fichiers, au même endroit.
+        Patient : {patientId ? String(patientId) : '-'}
       </Text>
 
       {/* Filtres */}
@@ -103,7 +101,7 @@ export default function PatientLibraryPage() {
           flexWrap: 'wrap',
         }}
       >
-        {(['all', 'text', 'files'] as FilterType[]).map((ft) => (
+        {(['all', 'text', 'files'] as TherapistFilterType[]).map((ft) => (
           <Pressable
             key={ft}
             onPress={() => handleFilterPress(ft)}
@@ -156,9 +154,9 @@ export default function PatientLibraryPage() {
             const itemId = String(item.id);
 
             const onPress = () => {
-              // texte + photo => page détail
+              // texte + photo => page détail therapist (lecture)
               if (typeValue === 'text' || typeValue === 'photo') {
-                router.push(`/(patient)/item/${item.id}` as any);
+                router.push(`/(therapist)/item/${item.id}` as any);
               } else {
                 openFileItem(item);
               }
@@ -170,8 +168,8 @@ export default function PatientLibraryPage() {
                 item={item}
                 thumbUrl={thumbUrls[itemId]}
                 onPress={onPress}
-                // Ajout : status discret dans la liste
-                isShared={sharedByItemId[itemId] === true}
+                // côté therapist, ce sont des items partagés (RLS)
+                isShared={true}
               />
             );
           })}
