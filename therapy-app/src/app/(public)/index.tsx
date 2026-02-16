@@ -1,47 +1,8 @@
-import { Text, View, Platform } from 'react-native';
+import { Text, View, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
-
-function GradientTitle({ children }: { children: string }) {
-  const isWeb = Platform.OS === 'web';
-
-  if (!isWeb) {
-    // Mobile fallback (pas de gradient)
-    return (
-      <Text
-        style={{
-          fontSize: 48,
-          fontWeight: '900',
-          textAlign: 'center',
-          color: colors.primary,
-        }}
-      >
-        {children}
-      </Text>
-    );
-  }
-
-  // Web gradient version
-  return (
-    <Text
-      style={
-        {
-          fontSize: 48,
-          fontWeight: '900',
-          textAlign: 'center',
-          backgroundImage: `linear-gradient(90deg, ${colors.primary}, #7C3AED)`,
-          WebkitBackgroundClip: 'text',
-          backgroundClip: 'text',
-          color: 'transparent',
-        } as any
-      }
-    >
-      {children}
-    </Text>
-  );
-}
 
 export default function PublicHomePage() {
   const router = useRouter();
@@ -52,8 +13,14 @@ export default function PublicHomePage() {
 
   return (
     <Screen centered style={{ justifyContent: 'center' }}>
-      {/* TITLE */}
-      <GradientTitle>Therapy Dashboard</GradientTitle>
+      {/* LOGO IMAGE */}
+      <View style={{ alignItems: 'center' }}>
+        <Image
+          source={require('../../assets/images/therapy-dashboard-big.svg')}
+          style={{ width: 320, height: 90 }}
+          resizeMode="contain"
+        />
+      </View>
 
       {/* TAGLINE */}
       <Text

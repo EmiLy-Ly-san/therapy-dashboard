@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, View, Switch, Platform, Alert } from 'react-native';
+import { Text, View, Platform, Alert, Image } from 'react-native';
 
 import LogoutButton from '../../components/auth/LogoutButton';
 import { uploadPatientFile } from '../../lib/uploadPatientFile';
@@ -15,7 +15,6 @@ export default function PatientDashboardPage() {
   const isWeb = Platform.OS === 'web';
   const { goToWritePage, goToLibraryPage } = usePatientDashboardActions();
 
-  const [isPrivateModeEnabled, setIsPrivateModeEnabled] = useState(false);
   const [displayName, setDisplayName] = useState<string>('');
 
   async function loadDisplayName() {
@@ -45,10 +44,6 @@ export default function PatientDashboardPage() {
     console.log('Recherche:', textValue);
   }
 
-  function handlePrivateModeToggle(nextValue: boolean) {
-    setIsPrivateModeEnabled(nextValue);
-  }
-
   async function handlePickFile() {
     try {
       const res = await uploadPatientFile();
@@ -70,10 +65,19 @@ export default function PatientDashboardPage() {
         }}
       >
         {/* HEADER */}
-        <View>
+        <View style={{ gap: 10 }}>
+          {/* LOGO */}
+          <View style={{ alignItems: 'flex-start' }}>
+            <Image
+              source={require('../../assets/images/therapy-dashboard-little.svg')}
+              style={{ width: 160, height: 40 }}
+              resizeMode="contain"
+            />
+          </View>
+
           <Text
             style={{
-              fontSize: 28,
+              fontSize: 16,
               fontWeight: '800',
               color: colors.textPrimary,
             }}
