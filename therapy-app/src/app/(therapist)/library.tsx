@@ -163,8 +163,7 @@ export default function TherapistLibraryPage() {
                 item={item}
                 thumbUrl={thumbUrls[itemId]}
                 onPress={onPress}
-                // côté therapist, c’est forcément partagé (vu via RLS)
-                isShared={true}
+                hidePrivateLabel
               />
             );
           })}

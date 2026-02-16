@@ -29,53 +29,63 @@ type Props = {
   item: any;
   thumbUrl?: string;
   onPress: () => void;
-
-  // Ajout : status discret
-  isShared?: boolean;
+  visibilityLabel?: string | null;
+  hidePrivateLabel?: boolean;
 };
 
 export default function LibraryItemCard({
   item,
   thumbUrl,
   onPress,
-  isShared = false,
+  visibilityLabel = null,
+  hidePrivateLabel = false,
 }: Props) {
   const typeValue = String(item.type || '');
   const titleValue = item.title ? String(item.title) : null;
   const textValue = item.text_content ? String(item.text_content) : '';
   const dateValue = item.created_at ? String(item.created_at) : '';
 
+  const shouldShowVisibility =
+    !!visibilityLabel &&
+    !(hidePrivateLabel && visibilityLabel.toLowerCase() === 'privé');
+
   return (
     <Card>
       <Pressable onPress={onPress}>
-        {/* Ligne info + status discret */}
         <View
           style={{
             flexDirection: 'row',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            gap: 12,
+            justifyContent: 'space-between',
+            gap: 10,
           }}
         >
           <Text style={{ fontSize: 12, color: colors.textSecondary }}>
             {getTypeLabel(typeValue)} • {dateValue ? formatDate(dateValue) : ''}
           </Text>
 
-          {/* Status discret (petite police) */}
-          <View
-            style={{
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: 'transparent',
-            }}
-          >
-            <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-              {isShared ? 'Partagé' : 'Privé'}
-            </Text>
-          </View>
+          {shouldShowVisibility ? (
+            <View
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.cardBackground,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: colors.textSecondary,
+                }}
+              >
+                {visibilityLabel}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <Text
