@@ -12,13 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import {
-  Text,
-  View,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-} from 'react-native';
+import { Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
@@ -28,6 +22,7 @@ import { supabase } from '../../lib/supabase';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
 import { usePatientItems, FilterType } from '../../hooks/usePatientItems';
+import { openStorageItem } from '../../lib/openStorageItem';
 
 export default function PatientLibraryPage() {
   const router = useRouter();
@@ -50,19 +45,6 @@ export default function PatientLibraryPage() {
 
   function handleFilterPress(nextFilter: FilterType) {
     setFilterType(nextFilter);
-  }
-
-  async function openFileItem(item: any) {
-    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-    const path = item.storage_path ? String(item.storage_path) : '';
-    if (!bucket || !path) return;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 10);
-
-    if (error) return;
-    if (data?.signedUrl) await Linking.openURL(data.signedUrl);
   }
 
   useEffect(() => {
@@ -170,24 +152,23 @@ export default function PatientLibraryPage() {
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
-            const itemId = String(item.id);
 
             const onPress = () => {
               if (typeValue === 'text' || typeValue === 'photo') {
                 router.push(`/(patient)/item/${item.id}` as any);
               } else {
-                openFileItem(item);
+                openStorageItem(item);
               }
             };
 
             return (
               <LibraryItemCard
-                key={itemId}
+                key={String(item.id)}
                 item={item}
-                thumbUrl={thumbUrls[itemId]}
+                thumbUrl={thumbUrls[String(item.id)]}
                 onPress={onPress}
                 visibilityLabel={
-                  sharedByItemId[itemId] === true ? 'Partagé' : 'Privé'
+                  sharedByItemId[String(item.id)] === true ? 'Partagé' : 'Privé'
                 }
               />
             );

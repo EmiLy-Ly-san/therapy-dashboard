@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { Screen, Button } from '../../../../components/ui';
 import { colors } from '../../../../constants';
 import { supabase } from '../../../../lib/supabase';
+import { getSignedUrl } from '../../../../lib/storageUrls';
 
 import LibraryItemCard from '../../../../components/library/LibraryItemCard';
 
@@ -40,12 +41,12 @@ export default function TherapistPatientLibraryPage() {
     const path = item.storage_path ? String(item.storage_path) : '';
     if (!bucket || !path) return;
 
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 10);
-
-    if (error) return;
-    if (data?.signedUrl) await Linking.openURL(data.signedUrl);
+    try {
+      const signedUrl = await getSignedUrl(bucket, path);
+      if (signedUrl) await Linking.openURL(signedUrl);
+    } catch (e) {
+      console.log('openFileItem error', e);
+    }
   }
 
   async function buildThumbs(list: any[]) {
@@ -60,11 +61,8 @@ export default function TherapistPatientLibraryPage() {
       if (!bucket || !path) continue;
 
       try {
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(path, 60 * 10);
-
-        if (!error && data?.signedUrl) next[String(it.id)] = data.signedUrl;
+        const signedUrl = await getSignedUrl(bucket, path);
+        if (signedUrl) next[String(it.id)] = signedUrl;
       } catch (e) {
         console.log('thumb error', e);
       }

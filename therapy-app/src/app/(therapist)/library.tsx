@@ -6,24 +6,18 @@
  */
 
 import { useEffect, useState } from 'react';
-import {
-  Text,
-  View,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-} from 'react-native';
+import { Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
-import { supabase } from '../../lib/supabase';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
 import {
   useTherapistItems,
   TherapistFilterType,
 } from '../../hooks/useTherapistItems';
+import { openStorageItem } from '../../lib/openStorageItem';
 
 export default function TherapistLibraryPage() {
   const router = useRouter();
@@ -45,19 +39,6 @@ export default function TherapistLibraryPage() {
 
   function handleFilterPress(nextFilter: TherapistFilterType) {
     setFilterType(nextFilter);
-  }
-
-  async function openFileItem(item: any) {
-    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-    const path = item.storage_path ? String(item.storage_path) : '';
-    if (!bucket || !path) return;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 10);
-
-    if (error) return;
-    if (data?.signedUrl) await Linking.openURL(data.signedUrl);
   }
 
   useEffect(() => {
@@ -133,35 +114,30 @@ export default function TherapistLibraryPage() {
         </Text>
       ) : null}
 
-      {/* Loader */}
       {shouldShowLoader ? (
         <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
-          <Text style={{ color: colors.textSecondary }}>Chargement…</Text>
         </View>
       ) : null}
 
-      {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
-            const itemId = String(item.id);
 
             const onPress = () => {
-              // texte + photo => page détail therapist (lecture)
               if (typeValue === 'text' || typeValue === 'photo') {
                 router.push(`/(therapist)/item/${item.id}` as any);
               } else {
-                openFileItem(item);
+                openStorageItem(item);
               }
             };
 
             return (
               <LibraryItemCard
-                key={itemId}
+                key={String(item.id)}
                 item={item}
-                thumbUrl={thumbUrls[itemId]}
+                thumbUrl={thumbUrls[String(item.id)]}
                 onPress={onPress}
                 hidePrivateLabel
               />
