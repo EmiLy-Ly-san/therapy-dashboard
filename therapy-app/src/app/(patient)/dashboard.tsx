@@ -1,4 +1,5 @@
 import { Text, View, Platform, Alert, Image } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import LogoutButton from '../../components/auth/LogoutButton';
 import { uploadPatientFile } from '../../lib/uploadPatientFile';
@@ -13,6 +14,7 @@ import { useDisplayName } from '../../hooks/useDisplayName';
 
 export default function PatientDashboardPage() {
   const isWeb = Platform.OS === 'web';
+  const router = useRouter();
   const { goToWritePage, goToLibraryPage } = usePatientDashboardActions();
 
   const { displayName } = useDisplayName({ firstNameOnly: true });
@@ -25,7 +27,12 @@ export default function PatientDashboardPage() {
     try {
       const res = await uploadPatientFile();
       if (!res.ok && res.reason === 'canceled') return;
-      Alert.alert('OK', 'Fichier ajouté ✅');
+
+      router.replace('/library?uploading=1');
+
+      setTimeout(() => {
+        Alert.alert('OK', 'Fichier ajouté ✅');
+      }, 50);
     } catch (e: any) {
       Alert.alert('Erreur', e?.message ?? JSON.stringify(e));
     }

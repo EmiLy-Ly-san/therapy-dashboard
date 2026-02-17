@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import { Text, View, Pressable, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
@@ -25,6 +25,7 @@ import PageHeader from '../../components/common/PageHeader';
 
 export default function PatientLibraryPage() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const [filterType, setFilterType] = useState<FilterType>('all');
 
@@ -38,6 +39,11 @@ export default function PatientLibraryPage() {
     sharedByItemId,
   } = usePatientItems(filterType);
 
+  const [isUploadingFromDashboard, setIsUploadingFromDashboard] =
+    useState(false);
+
+  const shouldShowAnyLoader = isUploadingFromDashboard || shouldShowLoader;
+
   function handleBackPress() {
     router.back();
   }
@@ -49,6 +55,20 @@ export default function PatientLibraryPage() {
   useEffect(() => {
     loadItems('initial');
   }, []);
+
+  useEffect(() => {
+    if (String(params.uploading ?? '') === '1') {
+      setIsUploadingFromDashboard(true);
+      loadItems('refresh');
+      router.setParams({ uploading: undefined } as any);
+    }
+  }, [params.uploading]);
+
+  useEffect(() => {
+    if (!isBusy && isUploadingFromDashboard) {
+      setIsUploadingFromDashboard(false);
+    }
+  }, [isBusy]);
 
   return (
     <Screen maxWidth={720}>
@@ -106,15 +126,20 @@ export default function PatientLibraryPage() {
       ) : null}
 
       {/* Loader */}
-      {shouldShowLoader ? (
+      {shouldShowAnyLoader ? (
         <View style={{ marginTop: 24, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
+          {isUploadingFromDashboard ? (
+            <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+              Upload en cours…
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
       {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
-        {!shouldShowLoader &&
+        {!shouldShowAnyLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
 
