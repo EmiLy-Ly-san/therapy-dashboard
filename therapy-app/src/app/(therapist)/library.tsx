@@ -3,6 +3,9 @@
  * -----------------------
  * - Liste des contenus visibles par le thérapeute
  * - Grâce à la RLS : uniquement ceux partagés par les patients
+ *
+ * Refacto :
+ * - La query passe par item_shares dans useTherapistItems()
  */
 
 import { useEffect, useState } from 'react';
@@ -114,18 +117,21 @@ export default function TherapistLibraryPage() {
         </Text>
       ) : null}
 
+      {/* Loader */}
       {shouldShowLoader ? (
         <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
         </View>
       ) : null}
 
+      {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
 
             const onPress = () => {
+              // texte + photo => page détail therapist (lecture)
               if (typeValue === 'text' || typeValue === 'photo') {
                 router.push(`/(therapist)/item/${item.id}` as any);
               } else {

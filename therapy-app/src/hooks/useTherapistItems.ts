@@ -1,11 +1,15 @@
 /**
- * Hook data pour la bibliothèque therapist
+ * useTherapistItems.ts
+ * --------------------
+ * Récupère les contenus visibles par le thérapeute.
  *
- * Objectif :
- * - Charger les items visibles par le therapist
- *   (grâce à la RLS : uniquement ceux partagés)
- * - Générer les miniatures pour les photos (signed url)
- * - Gérer les loaders (initial / refresh)
+ * IMPORTANT :
+ * - On passe par item_shares (et revoked_at IS NULL)
+ * - Donc on récupère UNIQUEMENT ce qui a été partagé
+ *
+ * Le hook gère aussi :
+ * - filtre all/text/files
+ * - thumbs pour les photos
  */
 
 import { useMemo, useState } from 'react';
@@ -14,98 +18,112 @@ import { getSignedUrl } from '../lib/storageUrls';
 
 export type TherapistFilterType = 'all' | 'text' | 'files';
 
-function wait(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+type LoadReason = 'initial' | 'refresh';
+
+function getTypeValue(item: any) {
+  return String(item?.type || '');
 }
 
-const MIN_LOADER_MS = 500;
+async function buildThumbs(list: any[]) {
+  const next: Record<string, string> = {};
+
+  for (const it of list ?? []) {
+    const typeValue = getTypeValue(it);
+    if (typeValue !== 'photo') continue;
+
+    const bucket = it?.storage_bucket ? String(it.storage_bucket) : '';
+    const path = it?.storage_path ? String(it.storage_path) : '';
+    if (!bucket || !path) continue;
+
+    try {
+      const signedUrl = await getSignedUrl(bucket, path);
+      if (signedUrl) next[String(it.id)] = signedUrl;
+    } catch (e) {
+      console.log('thumb error', e);
+    }
+  }
+
+  return next;
+}
 
 export function useTherapistItems(filterType: TherapistFilterType) {
   const [items, setItems] = useState<any[]>([]);
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState('');
+  const [isBusy, setIsBusy] = useState(false);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showLoader, setShowLoader] = useState(true);
-
-  async function buildThumbs(list: any[]) {
-    const next: Record<string, string> = {};
-
-    for (const it of list) {
-      const typeValue = String(it.type || '');
-      if (typeValue !== 'photo') continue;
-
-      const bucket = it.storage_bucket ? String(it.storage_bucket) : '';
-      const path = it.storage_path ? String(it.storage_path) : '';
-      if (!bucket || !path) continue;
-
-      try {
-        const url = await getSignedUrl(bucket, path, 60 * 10);
-        if (url) next[String(it.id)] = url;
-      } catch (e) {
-        console.log('thumb error', e);
-      }
-    }
-
-    setThumbUrls(next);
-  }
-
-  async function loadItems(reason: 'initial' | 'refresh' = 'refresh') {
-    setErrorMessage('');
-
-    if (reason === 'initial') setIsLoading(true);
-    else setIsRefreshing(true);
-
-    setShowLoader(true);
-    const startTime = Date.now();
-
-    // ⚠️ Important : côté therapist, on ne filtre pas par patient_id.
-    // On fait juste from('items') et la RLS fait le tri (items partagés seulement).
-    const { data, error } = await supabase
-      .from('items')
-      .select(
-        'id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type, patient_id',
-      )
-      .order('created_at', { ascending: false });
-
-    const elapsed = Date.now() - startTime;
-    await wait(Math.max(0, MIN_LOADER_MS - elapsed));
-
-    setIsLoading(false);
-    setIsRefreshing(false);
-    setShowLoader(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-
-    const list = data || [];
-    setItems(list);
-
-    await buildThumbs(list);
-  }
+  const shouldShowLoader = isBusy && items.length === 0;
 
   const visibleItems = useMemo(() => {
-    return items.filter((item) => {
-      const typeValue = String(item.type || '');
-      if (filterType === 'all') return true;
-      if (filterType === 'text') return typeValue === 'text';
-      return typeValue !== 'text';
-    });
+    if (filterType === 'all') return items;
+
+    if (filterType === 'text') {
+      return items.filter((it) => getTypeValue(it) === 'text');
+    }
+
+    // files = tout sauf texte (photo + audio + video + file…)
+    return items.filter((it) => getTypeValue(it) !== 'text');
   }, [items, filterType]);
 
-  const isBusy = isLoading || isRefreshing;
-  const shouldShowLoader = showLoader && isBusy;
+  async function loadItems(reason: LoadReason) {
+    setErrorMessage('');
+    setIsBusy(true);
+
+    try {
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !userData?.user) {
+        setErrorMessage("Tu n'es pas connecté(e).");
+        setIsBusy(false);
+        return;
+      }
+
+      const therapistId = userData.user.id;
+
+      // On récupère UNIQUEMENT les items partagés (via item_shares)
+      // NB: la RLS limite déjà, mais là c’est “secure by design”
+      const { data, error } = await supabase
+        .from('item_shares')
+        .select(
+          `
+          item:items (
+            id, patient_id, type, title, text_content, created_at,
+            storage_bucket, storage_path, mime_type
+          )
+        `,
+        )
+        .eq('therapist_id', therapistId)
+        .is('revoked_at', null)
+        .order('shared_at', { ascending: false });
+
+      if (error) throw error;
+
+      const list = (data ?? []).map((r: any) => r.item).filter(Boolean);
+
+      setItems(list);
+
+      // thumbs (photos)
+      const nextThumbs = await buildThumbs(list);
+      setThumbUrls(nextThumbs);
+    } catch (e: any) {
+      console.log('LOAD THERAPIST ITEMS ERROR', e);
+      setErrorMessage(e?.message ?? JSON.stringify(e));
+
+      // si refresh échoue, on ne casse pas l’écran
+      if (reason === 'initial') {
+        setItems([]);
+        setThumbUrls({});
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  }
 
   return {
-    items,
     visibleItems,
     thumbUrls,
     errorMessage,
-    isLoading,
-    isRefreshing,
     isBusy,
     shouldShowLoader,
     loadItems,

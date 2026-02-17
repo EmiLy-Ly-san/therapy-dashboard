@@ -8,16 +8,17 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Text, View, ActivityIndicator, Linking } from 'react-native';
+import { Text, View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { Screen, Button } from '../../../../components/ui';
 import { colors } from '../../../../constants';
 import { supabase } from '../../../../lib/supabase';
-import { getSignedUrl } from '../../../../lib/storageUrls';
 
 import LibraryItemCard from '../../../../components/library/LibraryItemCard';
+import { openStorageItem } from '../../../../lib/openStorageItem';
+import { getSignedUrl } from '../../../../lib/storageUrls';
 
 function getTypeValue(item: any) {
   return String(item?.type || '');
@@ -36,19 +37,6 @@ export default function TherapistPatientLibraryPage() {
     router.back();
   }
 
-  async function openFileItem(item: any) {
-    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-    const path = item.storage_path ? String(item.storage_path) : '';
-    if (!bucket || !path) return;
-
-    try {
-      const signedUrl = await getSignedUrl(bucket, path);
-      if (signedUrl) await Linking.openURL(signedUrl);
-    } catch (e) {
-      console.log('openFileItem error', e);
-    }
-  }
-
   async function buildThumbs(list: any[]) {
     const next: Record<string, string> = {};
 
@@ -56,8 +44,8 @@ export default function TherapistPatientLibraryPage() {
       const typeValue = getTypeValue(it);
       if (typeValue !== 'photo') continue;
 
-      const bucket = it.storage_bucket ? String(it.storage_bucket) : '';
-      const path = it.storage_path ? String(it.storage_path) : '';
+      const bucket = it?.storage_bucket ? String(it.storage_bucket) : '';
+      const path = it?.storage_path ? String(it.storage_path) : '';
       if (!bucket || !path) continue;
 
       try {
@@ -84,19 +72,36 @@ export default function TherapistPatientLibraryPage() {
 
       const pid = String(patientId);
 
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !userData?.user) {
+        setErrorMessage("Tu n'es pas connecté(e).");
+        setIsLoading(false);
+        return;
+      }
+
+      const therapistId = userData.user.id;
+
       // On récupère uniquement les items partagés (via item_shares) pour ce patient
       // NB: la RLS limite deja au therapist connecté
       const { data, error } = await supabase
-        .from('items')
+        .from('item_shares')
         .select(
-          'id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type',
+          `
+          item:items (
+            id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type, patient_id
+          )
+        `,
         )
-        .eq('patient_id', pid)
-        .order('created_at', { ascending: false });
+        .eq('therapist_id', therapistId)
+        .is('revoked_at', null)
+        .eq('item.patient_id', pid)
+        .order('shared_at', { ascending: false });
 
       if (error) throw error;
 
-      const list = data ?? [];
+      const list = (data ?? []).map((r: any) => r.item).filter(Boolean);
 
       setItems(list);
       await buildThumbs(list);
@@ -180,7 +185,7 @@ export default function TherapistPatientLibraryPage() {
                   if (typeValue === 'text' || typeValue === 'photo') {
                     router.push(`/(therapist)/item/${item.id}` as any);
                   } else {
-                    openFileItem(item);
+                    openStorageItem(item);
                   }
                 };
 
