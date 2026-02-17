@@ -9,36 +9,14 @@ import { colors } from '../../constants';
 
 import DashboardSectionCard from '../../components/dashboard/DashboardSectionCard';
 import usePatientDashboardActions from '../../hooks/usePatientDashboardActions';
-import { supabase } from '../../lib/supabase';
+
+import { useDisplayName } from '../../hooks/useDisplayName';
 
 export default function PatientDashboardPage() {
   const isWeb = Platform.OS === 'web';
   const { goToWritePage, goToLibraryPage } = usePatientDashboardActions();
 
-  const [displayName, setDisplayName] = useState<string>('');
-
-  async function loadDisplayName() {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) return;
-
-    const { data } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', userData.user.id)
-      .maybeSingle();
-
-    if (data?.display_name) {
-      const raw = String(data.display_name).trim();
-      if (raw.length > 0) {
-        // On affiche juste le prénom
-        setDisplayName(raw.split(' ')[0]);
-      }
-    }
-  }
-
-  useEffect(() => {
-    loadDisplayName();
-  }, []);
+  const { displayName } = useDisplayName({ firstNameOnly: true });
 
   function handleSearchChange(textValue: string) {
     console.log('Recherche:', textValue);
