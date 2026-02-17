@@ -1,5 +1,11 @@
 import { ReactNode } from 'react';
-import { Platform, ScrollView, View, ViewStyle } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '../../constants';
@@ -24,25 +30,35 @@ export default function Screen({
       style={{ flex: 1, backgroundColor: colors.background }}
       edges={['top', 'left', 'right']}
     >
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          padding: 24,
-          ...(centered ? { justifyContent: 'center' } : {}),
-        }}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // petit offset pour éviter que ça "colle" au top sur iOS
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        <View
-          style={{
-            width: '100%',
-            maxWidth: isWeb ? maxWidth : '100%',
-            alignSelf: 'center',
-            ...(style || {}),
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            padding: 24,
+            ...(centered ? { justifyContent: 'center' } : {}),
           }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={
+            Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+          }
         >
-          {children}
-        </View>
-      </ScrollView>
+          <View
+            style={{
+              width: '100%',
+              maxWidth: isWeb ? maxWidth : '100%',
+              alignSelf: 'center',
+              ...(style || {}),
+            }}
+          >
+            {children}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
