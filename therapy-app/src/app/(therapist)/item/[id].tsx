@@ -1,58 +1,26 @@
-import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 
 import { Screen, Card, Button } from '../../../components/ui';
 import { colors } from '../../../constants';
-import { supabase } from '../../../lib/supabase';
 
 import PhotoPreview from '../../../components/item/PhotoPreview';
-import PageHeader from '../../../components/common/PageHeader';
+import { useTherapistItem } from '../../../hooks/useTherapistItem';
 
 export default function TherapistItemDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const isWeb = Platform.OS === 'web';
 
-  const [item, setItem] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
+  const itemId = id ? String(id) : null;
+
+  const { item, isLoading, errorMessage, isText, isPhoto } =
+    useTherapistItem(itemId);
 
   function handleBackPress() {
     router.back();
   }
-
-  async function loadItem() {
-    setErrorMessage('');
-
-    if (!id) {
-      setErrorMessage("ID manquant (impossible d'ouvrir l'item).");
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-
-    // RLS : le therapist ne peut lire que les items partagés
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .eq('id', String(id))
-      .single();
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    setItem(data);
-    setIsLoading(false);
-  }
-
-  useEffect(() => {
-    loadItem();
-  }, [id]);
 
   if (isLoading) {
     return (
@@ -82,10 +50,6 @@ export default function TherapistItemDetailPage() {
     );
   }
 
-  const typeValue = String(item.type || '');
-  const isText = typeValue === 'text';
-  const isPhoto = typeValue === 'photo';
-
   return (
     <Screen centered={false} style={{ justifyContent: 'flex-start' }}>
       <View
@@ -96,11 +60,42 @@ export default function TherapistItemDetailPage() {
           gap: 24,
         }}
       >
-        <PageHeader
-          title="Détail"
-          iconName="file-text"
-          onBack={handleBackPress}
-        />
+        {/* HEADER */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#EEF2FF',
+              }}
+            >
+              <Feather name="file-text" size={18} color={colors.primary} />
+            </View>
+
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '800',
+                color: colors.textPrimary,
+              }}
+            >
+              Détail
+            </Text>
+          </View>
+
+          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
+        </View>
 
         {errorMessage.length > 0 ? (
           <Text style={{ color: colors.danger }}>{errorMessage}</Text>

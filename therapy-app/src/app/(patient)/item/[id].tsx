@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
 import {
-  View,
   Text,
+  View,
   TextInput,
   Pressable,
   Switch,
@@ -11,165 +10,59 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Screen, Card, Button } from '../../../components/ui';
 import { colors } from '../../../constants';
-import { supabase } from '../../../lib/supabase';
 
 import PhotoPreview from '../../../components/item/PhotoPreview';
 import ItemNotesSection from '../../../components/item/ItemNotesSection';
 import PageHeader from '../../../components/common/PageHeader';
 
 import { useItemShare } from '../../../hooks/useItemShare';
+import { usePatientItem } from '../../../hooks/usePatientItem';
 
 export default function ItemDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const itemId = id ? String(id) : null;
 
-  const [item, setItem] = useState<any>(null);
-  const [textValue, setTextValue] = useState('');
-  const [titleValue, setTitleValue] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  // Data item (load/save/delete)
+  const {
+    item,
+    isText,
+    isPhoto,
+    titleValue,
+    setTitleValue,
+    textValue,
+    setTextValue,
+    isLoading,
+    isSaving,
+    isDeleting,
+    errorMessage,
+    saveText,
+    deleteItem,
+  } = usePatientItem(itemId);
 
-  // Ajout : toggle Partager avec le thérapeute
+  // Toggle partage vers thérapeute
   const {
     therapistId,
     isShared,
     isTogglingShare,
     errorMessage: shareErrorMessage,
     setShareEnabled,
-  } = useItemShare(id ? String(id) : null);
+  } = useItemShare(itemId);
 
   function handleBackPress() {
     // Retour stable vers la library
     router.replace('/(patient)/library' as any);
   }
 
-  async function loadItem() {
-    setErrorMessage('');
-
-    if (!id) {
-      setErrorMessage("ID manquant (impossible d'ouvrir l'item).");
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    setItem(data);
-
-    if (data?.type === 'text') {
-      setTextValue(data.text_content || '');
-      setTitleValue(data.title || '');
-    } else {
-      setTextValue('');
-      setTitleValue('');
-    }
-
-    setIsLoading(false);
-  }
-
   async function handleSavePress() {
-    if (!id) {
-      setErrorMessage("ID manquant (impossible d'enregistrer).");
-      return;
-    }
-
-    if (!item || item.type !== 'text') {
-      setErrorMessage("Cet item n'est pas un texte.");
-      return;
-    }
-
-    setIsSaving(true);
-    setErrorMessage('');
-
-    const cleanTitle = titleValue.trim();
-    const cleanText = textValue.trim();
-
-    if (cleanText.length === 0) {
-      setIsSaving(false);
-      setErrorMessage('Le texte ne peut pas être vide.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('items')
-      .update({
-        title: cleanTitle.length > 0 ? cleanTitle : null,
-        text_content: cleanText,
-      })
-      .eq('id', id);
-
-    setIsSaving(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-
-    handleBackPress();
+    const ok = await saveText();
+    if (ok) handleBackPress();
   }
 
-  async function deleteItem() {
-    if (!id || !item) return;
-
-    try {
-      setIsDeleting(true);
-      setErrorMessage('');
-
-      // 1) supprimer les notes liées à cet item
-      const { error: notesError } = await supabase
-        .from('item_notes')
-        .delete()
-        .eq('item_id', id);
-
-      if (notesError) throw notesError;
-
-      // 2) supprimer le fichier storage s'il existe
-      const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-      const path = item.storage_path ? String(item.storage_path) : '';
-
-      if (bucket && path) {
-        const { error: storageError } = await supabase.storage
-          .from(bucket)
-          .remove([path]);
-
-        if (storageError) throw storageError;
-      }
-
-      // 3) supprimer l'item
-      // (avec ON DELETE CASCADE côté DB, item_shares sera supprimé automatiquement)
-      const { error: itemError } = await supabase
-        .from('items')
-        .delete()
-        .eq('id', id);
-
-      if (itemError) throw itemError;
-
-      handleBackPress();
-    } catch (e: any) {
-      console.log('DELETE ITEM ERROR', e);
-      setErrorMessage(e?.message ?? JSON.stringify(e));
-    } finally {
-      setIsDeleting(false);
-    }
+  async function handleDeletePress() {
+    const ok = await deleteItem();
+    if (ok) handleBackPress();
   }
-
-  useEffect(() => {
-    loadItem();
-  }, [id]);
 
   if (isLoading) {
     return (
@@ -192,10 +85,6 @@ export default function ItemDetailPage() {
       </Screen>
     );
   }
-
-  const typeValue = String(item.type || '');
-  const isText = typeValue === 'text';
-  const isPhoto = typeValue === 'photo';
 
   return (
     <Screen centered maxWidth={720}>
@@ -247,12 +136,8 @@ export default function ItemDetailPage() {
 
         <Switch
           value={isShared}
-          onValueChange={(v) => {
-            // feedback immédiat : le switch bouge
-            // puis on applique en base
-            setShareEnabled(v);
-          }}
-          disabled={isTogglingShare || !id}
+          onValueChange={(v) => setShareEnabled(v)}
+          disabled={isTogglingShare || !itemId}
         />
       </View>
 
@@ -299,12 +184,12 @@ export default function ItemDetailPage() {
       ) : null}
 
       {/* NOTES */}
-      <ItemNotesSection itemId={String(id)} />
+      <ItemNotesSection itemId={String(itemId)} />
 
       {/* SUPPRIMER ITEM : bouton léger rouge (outline) */}
       <View style={{ marginTop: 18 }}>
         <Pressable
-          onPress={deleteItem}
+          onPress={handleDeletePress}
           disabled={isDeleting}
           style={{
             paddingVertical: 12,
