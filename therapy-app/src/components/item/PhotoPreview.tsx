@@ -7,8 +7,8 @@
 
 import { useEffect, useState } from 'react';
 import { View, Image, Text } from 'react-native';
-import { supabase } from '../../lib/supabase';
 import { colors } from '../../constants';
+import { getSignedUrl } from '../../lib/storageUrls';
 
 type Props = {
   bucket?: string | null;
@@ -19,23 +19,26 @@ export default function PhotoPreview({ bucket, path }: Props) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    let canceled = false;
+
     async function loadImage() {
       if (!bucket || !path) return;
 
-      // 1) Génère une URL temporaire
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, 60 * 10);
-
-      if (error) {
+      try {
+        // 1) Génère une URL temporaire
+        const signedUrl = await getSignedUrl(bucket, path, 60 * 10);
+        if (!canceled) setImageUrl(signedUrl || null);
+      } catch (error) {
         console.log('image error', error);
-        return;
+        if (!canceled) setImageUrl(null);
       }
-
-      setImageUrl(data?.signedUrl ?? null);
     }
 
     loadImage();
+
+    return () => {
+      canceled = true;
+    };
   }, [bucket, path]);
 
   if (!imageUrl) {
