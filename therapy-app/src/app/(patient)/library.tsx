@@ -45,7 +45,13 @@ export default function PatientLibraryPage() {
   const shouldShowAnyLoader = isUploadingFromDashboard || shouldShowLoader;
 
   function handleBackPress() {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    // Fallback : on renvoie vers le dashboard patient (à adapter si ton chemin exact diffère)
+    router.replace('/(patient)/dashboard' as any);
   }
 
   function handleFilterPress(nextFilter: FilterType) {
