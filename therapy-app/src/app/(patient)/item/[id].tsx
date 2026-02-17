@@ -17,6 +17,8 @@ import PhotoPreview from '../../../components/item/PhotoPreview';
 import ItemNotesSection from '../../../components/item/ItemNotesSection';
 import PageHeader from '../../../components/common/PageHeader';
 
+import { useItemShare } from '../../../hooks/useItemShare';
+
 export default function ItemDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -30,102 +32,17 @@ export default function ItemDetailPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   // Ajout : toggle Partager avec le thérapeute
-  const [therapistId, setTherapistId] = useState<string | null>(null);
-  const [isShared, setIsShared] = useState(false);
-  const [isTogglingShare, setIsTogglingShare] = useState(false);
+  const {
+    therapistId,
+    isShared,
+    isTogglingShare,
+    errorMessage: shareErrorMessage,
+    setShareEnabled,
+  } = useItemShare(id ? String(id) : null);
 
   function handleBackPress() {
     // Retour stable vers la library
     router.replace('/(patient)/library' as any);
-  }
-
-  // Ajout : récupère therapist_id actif
-  async function fetchTherapistId() {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData?.user) return null;
-
-    const userId = userData.user.id;
-
-    const { data, error } = await supabase
-      .from('therapist_patients')
-      .select('therapist_id')
-      .eq('patient_id', userId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data?.therapist_id ? String(data.therapist_id) : null;
-  }
-
-  async function refreshShareState(itemId: string, tid: string | null) {
-    if (!tid) {
-      setIsShared(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('item_shares')
-      .select('id')
-      .eq('item_id', itemId)
-      .eq('therapist_id', tid)
-      .is('revoked_at', null)
-      .limit(1);
-
-    if (error) throw error;
-    setIsShared((data ?? []).length > 0);
-  }
-
-  // Ajout : applique la valeur du toggle
-  async function setShareEnabled(itemId: string, enabled: boolean) {
-    setIsTogglingShare(true);
-    setErrorMessage('');
-
-    try {
-      let tid = therapistId;
-      if (!tid) {
-        tid = await fetchTherapistId();
-        setTherapistId(tid);
-      }
-
-      if (!tid) {
-        setErrorMessage("Aucun thérapeute actif n'est lié à ce patient.");
-        // On remet l’état UI cohérent
-        setIsShared(false);
-        return;
-      }
-
-      if (enabled) {
-        const { error } = await supabase.from('item_shares').upsert(
-          {
-            item_id: itemId,
-            therapist_id: tid,
-            shared_at: new Date().toISOString(),
-            revoked_at: null,
-          },
-          { onConflict: 'item_id,therapist_id' },
-        );
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('item_shares')
-          .update({ revoked_at: new Date().toISOString() })
-          .eq('item_id', itemId)
-          .eq('therapist_id', tid)
-          .is('revoked_at', null);
-
-        if (error) throw error;
-      }
-
-      await refreshShareState(itemId, tid);
-    } catch (e: any) {
-      console.log('TOGGLE SHARE DETAIL ERROR', e);
-      setErrorMessage(e?.message ?? JSON.stringify(e));
-    } finally {
-      setIsTogglingShare(false);
-    }
   }
 
   async function loadItem() {
@@ -159,15 +76,6 @@ export default function ItemDetailPage() {
     } else {
       setTextValue('');
       setTitleValue('');
-    }
-
-    //  charge l’état du partage
-    try {
-      const tid = await fetchTherapistId();
-      setTherapistId(tid);
-      await refreshShareState(String(id), tid);
-    } catch (e) {
-      console.log('share state load error', e);
     }
 
     setIsLoading(false);
@@ -297,9 +205,17 @@ export default function ItemDetailPage() {
         onBack={handleBackPress}
       />
 
+      {/* Erreurs item */}
       {errorMessage.length > 0 ? (
         <Text style={{ marginTop: 10, color: colors.danger }}>
           {errorMessage}
+        </Text>
+      ) : null}
+
+      {/* Erreurs partage */}
+      {shareErrorMessage.length > 0 ? (
+        <Text style={{ marginTop: 10, color: colors.danger }}>
+          {shareErrorMessage}
         </Text>
       ) : null}
 
@@ -332,9 +248,9 @@ export default function ItemDetailPage() {
         <Switch
           value={isShared}
           onValueChange={(v) => {
-            if (!id) return;
-            setIsShared(v); // feedback immédiat
-            setShareEnabled(String(id), v);
+            // feedback immédiat : le switch bouge
+            // puis on applique en base
+            setShareEnabled(v);
           }}
           disabled={isTogglingShare || !id}
         />
