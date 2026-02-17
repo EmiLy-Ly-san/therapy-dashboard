@@ -21,6 +21,7 @@ import {
   TherapistFilterType,
 } from '../../hooks/useTherapistItems';
 import { openStorageItem } from '../../lib/openStorageItem';
+import PageHeader from '../../components/common/PageHeader';
 
 export default function TherapistLibraryPage() {
   const router = useRouter();
@@ -50,26 +51,12 @@ export default function TherapistLibraryPage() {
 
   return (
     <Screen centered maxWidth={720}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Text
-          style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
-        >
-          Contenus partagés
-        </Text>
-
-        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-      </View>
-
-      <Text style={{ marginTop: 8, color: colors.textSecondary }}>
-        Uniquement les contenus partagés par les patients.
-      </Text>
+      <PageHeader
+        title="Contenus partagés"
+        iconName="book-open"
+        onBack={handleBackPress}
+        subtitle="Uniquement les contenus partagés par les patients."
+      />
 
       {/* Filtres */}
       <View
@@ -117,21 +104,18 @@ export default function TherapistLibraryPage() {
         </Text>
       ) : null}
 
-      {/* Loader */}
       {shouldShowLoader ? (
         <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
         </View>
       ) : null}
 
-      {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
 
             const onPress = () => {
-              // texte + photo => page détail therapist (lecture)
               if (typeValue === 'text' || typeValue === 'photo') {
                 router.push(`/(therapist)/item/${item.id}` as any);
               } else {

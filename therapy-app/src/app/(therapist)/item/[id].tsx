@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 
 import { Screen, Card, Button } from '../../../components/ui';
 import { colors } from '../../../constants';
 import { supabase } from '../../../lib/supabase';
 
 import PhotoPreview from '../../../components/item/PhotoPreview';
+import PageHeader from '../../../components/common/PageHeader';
 
 export default function TherapistItemDetailPage() {
   const router = useRouter();
@@ -96,42 +96,11 @@ export default function TherapistItemDetailPage() {
           gap: 24,
         }}
       >
-        {/* HEADER */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#EEF2FF',
-              }}
-            >
-              <Feather name="file-text" size={18} color={colors.primary} />
-            </View>
-
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '800',
-                color: colors.textPrimary,
-              }}
-            >
-              Détail
-            </Text>
-          </View>
-
-          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-        </View>
+        <PageHeader
+          title="Détail"
+          iconName="file-text"
+          onBack={handleBackPress}
+        />
 
         {errorMessage.length > 0 ? (
           <Text style={{ color: colors.danger }}>{errorMessage}</Text>

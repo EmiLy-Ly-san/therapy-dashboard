@@ -14,15 +14,14 @@
 import { useEffect, useState } from 'react';
 import { Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
-import { supabase } from '../../lib/supabase';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
 import { usePatientItems, FilterType } from '../../hooks/usePatientItems';
 import { openStorageItem } from '../../lib/openStorageItem';
+import PageHeader from '../../components/common/PageHeader';
 
 export default function PatientLibraryPage() {
   const router = useRouter();
@@ -53,46 +52,12 @@ export default function PatientLibraryPage() {
 
   return (
     <Screen maxWidth={720}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#EEF2FF',
-            }}
-          >
-            <Feather name="book-open" size={18} color={colors.primary} />
-          </View>
-
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: '800',
-              color: colors.textPrimary,
-            }}
-          >
-            Mes contenus
-          </Text>
-        </View>
-
-        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-      </View>
-
-      <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-        Tous tes textes et fichiers, au même endroit.
-      </Text>
+      <PageHeader
+        title="Mes contenus"
+        iconName="book-open"
+        onBack={handleBackPress}
+        subtitle="Tous tes textes et fichiers, au même endroit."
+      />
 
       {/* Filtres */}
       <View

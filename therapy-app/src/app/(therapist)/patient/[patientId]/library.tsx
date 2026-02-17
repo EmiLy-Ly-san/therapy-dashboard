@@ -10,15 +10,15 @@
 import { useEffect, useState } from 'react';
 import { Text, View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 
-import { Screen, Button } from '../../../../components/ui';
+import { Screen } from '../../../../components/ui';
 import { colors } from '../../../../constants';
 import { supabase } from '../../../../lib/supabase';
 
 import LibraryItemCard from '../../../../components/library/LibraryItemCard';
 import { openStorageItem } from '../../../../lib/openStorageItem';
 import { getSignedUrl } from '../../../../lib/storageUrls';
+import PageHeader from '../../../../components/common/PageHeader';
 
 function getTypeValue(item: any) {
   return String(item?.type || '');
@@ -83,8 +83,6 @@ export default function TherapistPatientLibraryPage() {
 
       const therapistId = userData.user.id;
 
-      // On récupère uniquement les items partagés (via item_shares) pour ce patient
-      // NB: la RLS limite deja au therapist connecté
       const { data, error } = await supabase
         .from('item_shares')
         .select(
@@ -120,46 +118,12 @@ export default function TherapistPatientLibraryPage() {
   return (
     <Screen maxWidth={720}>
       <View style={{ width: '100%', alignSelf: 'center', gap: 24 }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#EEF2FF',
-              }}
-            >
-              <Feather name="share-2" size={18} color={colors.primary} />
-            </View>
-
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '800',
-                color: colors.textPrimary,
-              }}
-            >
-              Contenus partagés
-            </Text>
-          </View>
-
-          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-        </View>
-
-        <Text style={{ marginTop: -8, color: colors.textSecondary }}>
-          Contenus partagés par le patient.
-        </Text>
+        <PageHeader
+          title="Contenus partagés"
+          iconName="share-2"
+          onBack={handleBackPress}
+          subtitle="Contenus partagés par le patient."
+        />
 
         {errorMessage.length > 0 ? (
           <Text style={{ marginTop: 12, color: colors.danger }}>
