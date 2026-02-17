@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Platform, ScrollView, View, ViewStyle } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '../../constants';
 
@@ -19,25 +20,29 @@ export default function Screen({
   const isWeb = Platform.OS === 'web';
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        flexGrow: 1,
-        backgroundColor: colors.background,
-        padding: 24,
-        ...(centered ? { justifyContent: 'center' } : {}),
-      }}
-      keyboardShouldPersistTaps="handled"
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={['top', 'left', 'right']}
     >
-      <View
-        style={{
-          width: '100%',
-          maxWidth: isWeb ? maxWidth : '100%',
-          alignSelf: 'center',
-          ...(style || {}),
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          padding: 24,
+          ...(centered ? { justifyContent: 'center' } : {}),
         }}
+        keyboardShouldPersistTaps="handled"
       >
-        {children}
-      </View>
-    </ScrollView>
+        <View
+          style={{
+            width: '100%',
+            maxWidth: isWeb ? maxWidth : '100%',
+            alignSelf: 'center',
+            ...(style || {}),
+          }}
+        >
+          {children}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

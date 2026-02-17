@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-url-polyfill/auto';
 // Ce polyfill ajoute certaines fonctions web (URL, atob, etc.)
 // qui ne sont pas toujours disponibles en React Native.
@@ -8,5 +9,9 @@ import 'react-native-url-polyfill/auto';
 // une seule fois au démarrage de l’application.
 
 export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </SafeAreaProvider>
+  );
 }

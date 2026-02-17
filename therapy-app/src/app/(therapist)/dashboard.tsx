@@ -123,7 +123,7 @@ export default function TherapistDashboardPage() {
         {/* HEADER (même esprit que patient) */}
         <View style={{ gap: 16 }}>
           <Image
-            source={require('../../assets/images/therapy-dashboard-little.svg')}
+            source={require('../../assets/images/therapy-dashboard-little.png')}
             style={{ width: 180, height: 42 }}
             resizeMode="contain"
           />

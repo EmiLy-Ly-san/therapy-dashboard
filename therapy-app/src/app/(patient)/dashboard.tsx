@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Text, View, Platform, Alert, Image } from 'react-native';
 
 import LogoutButton from '../../components/auth/LogoutButton';
@@ -45,7 +44,7 @@ export default function PatientDashboardPage() {
         {/* HEADER */}
         <View style={{ gap: 16 }}>
           <Image
-            source={require('../../assets/images/therapy-dashboard-little.svg')}
+            source={require('../../assets/images/therapy-dashboard-little.png')}
             style={{ width: 180, height: 42 }}
             resizeMode="contain"
           />

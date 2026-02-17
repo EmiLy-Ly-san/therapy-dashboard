@@ -88,7 +88,7 @@ export default function PublicHomePage() {
           }}
         >
           <Image
-            source={require('../../assets/images/therapy-dashboard-big.svg')}
+            source={require('../../assets/images/therapy-dashboard-big.png')}
             style={{ width: 320, height: 90 }}
             resizeMode="contain"
           />
