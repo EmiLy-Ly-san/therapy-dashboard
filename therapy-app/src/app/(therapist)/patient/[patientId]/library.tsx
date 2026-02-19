@@ -16,7 +16,6 @@ import { colors } from '../../../../constants';
 import { supabase } from '../../../../lib/supabase';
 
 import LibraryItemCard from '../../../../components/library/LibraryItemCard';
-import { openStorageItem } from '../../../../lib/openStorageItem';
 import { getSignedUrl } from '../../../../lib/storageUrls';
 import PageHeader from '../../../../components/common/PageHeader';
 
@@ -143,14 +142,10 @@ export default function TherapistPatientLibraryPage() {
               </Text>
             ) : (
               items.map((item) => {
-                const typeValue = getTypeValue(item);
-
                 const onPress = () => {
-                  if (typeValue === 'text' || typeValue === 'photo') {
-                    router.push(`/(therapist)/item/${item.id}` as any);
-                  } else {
-                    openStorageItem(item);
-                  }
+                  // Unifie l'expérience : TOUS les types ouvrent la page détail therapist
+                  // (audio/vidéo seront lus dans la page détail avec expo-video)
+                  router.push(`/(therapist)/item/${item.id}` as any);
                 };
 
                 return (

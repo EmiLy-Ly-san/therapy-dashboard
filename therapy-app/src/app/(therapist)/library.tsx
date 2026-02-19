@@ -20,7 +20,6 @@ import {
   useTherapistItems,
   TherapistFilterType,
 } from '../../hooks/useTherapistItems';
-import { openStorageItem } from '../../lib/openStorageItem';
 import PageHeader from '../../components/common/PageHeader';
 
 export default function TherapistLibraryPage() {
@@ -116,11 +115,9 @@ export default function TherapistLibraryPage() {
             const typeValue = String(item.type || '');
 
             const onPress = () => {
-              if (typeValue === 'text' || typeValue === 'photo') {
-                router.push(`/(therapist)/item/${item.id}` as any);
-              } else {
-                openStorageItem(item);
-              }
+              // ✅ Unifie l'expérience : tous les types ouvrent la page détail
+              // (audio/vidéo seront lus dans la page détail avec expo-video)
+              router.push(`/(therapist)/item/${item.id}` as any);
             };
 
             return (

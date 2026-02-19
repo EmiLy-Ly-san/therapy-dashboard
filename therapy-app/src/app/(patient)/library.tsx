@@ -20,7 +20,6 @@ import { colors } from '../../constants';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
 import { usePatientItems, FilterType } from '../../hooks/usePatientItems';
-import { openStorageItem } from '../../lib/openStorageItem';
 import PageHeader from '../../components/common/PageHeader';
 
 export default function PatientLibraryPage() {
@@ -45,12 +44,11 @@ export default function PatientLibraryPage() {
   const shouldShowAnyLoader = isUploadingFromDashboard || shouldShowLoader;
 
   function handleBackPress() {
+    // Back stable : si pas d'historique, on revient au dashboard patient
     if (router.canGoBack()) {
       router.back();
       return;
     }
-
-    // Fallback : on renvoie vers le dashboard patient (à adapter si ton chemin exact diffère)
     router.replace('/(patient)/dashboard' as any);
   }
 
@@ -147,14 +145,9 @@ export default function PatientLibraryPage() {
       <View style={{ marginTop: 12, gap: 12 }}>
         {!shouldShowAnyLoader &&
           visibleItems.map((item) => {
-            const typeValue = String(item.type || '');
-
             const onPress = () => {
-              if (typeValue === 'text' || typeValue === 'photo') {
-                router.push(`/(patient)/item/${item.id}` as any);
-              } else {
-                openStorageItem(item);
-              }
+              //  Unifie l'expérience : tous les types ouvrent la page détail
+              router.push(`/(patient)/item/${item.id}` as any);
             };
 
             return (

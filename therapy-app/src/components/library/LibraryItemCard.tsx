@@ -145,7 +145,7 @@ export default function LibraryItemCard({
         {/* AUTRES FICHIERS */}
         {typeValue !== 'text' && typeValue !== 'photo' ? (
           <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-            Appuie pour ouvrir le fichier
+            Appuie pour voir le détail
           </Text>
         ) : null}
       </Pressable>
