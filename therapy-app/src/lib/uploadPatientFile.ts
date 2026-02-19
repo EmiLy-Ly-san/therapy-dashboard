@@ -1,5 +1,11 @@
+/**
+ * uploadPatientFile.ts
+ * --------------------
+ * Upload compatible Android / iOS / Web (Expo + Supabase Storage)
+ */
+
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
@@ -12,21 +18,9 @@ function getItemType(mimeType?: string) {
   return 'file';
 }
 
-// base64 -> Uint8Array (simple)
-function base64ToUint8Array(base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
 export async function uploadPatientFile() {
   console.log('uploadPatientFile: start');
-  // 1) Choisir un fichier
+
   const result = await DocumentPicker.getDocumentAsync({
     multiple: false,
     copyToCacheDirectory: true,
@@ -38,14 +32,12 @@ export async function uploadPatientFile() {
 
   const file = result.assets[0];
 
-  // 2) User connecté
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
 
   const user = authData.user;
   if (!user) throw new Error('Utilisateur non connecté');
 
-  // 3) Infos fichier
   const mimeType = file.mimeType ?? 'application/octet-stream';
   const type = getItemType(mimeType);
 
@@ -54,37 +46,65 @@ export async function uploadPatientFile() {
 
   const storageBucket = 'patient-files';
   const storagePath = `patients/${user.id}/${Date.now()}.${fileExt}`;
+
   console.log('picked file:', file?.name, file?.mimeType, file?.uri);
+  console.log('storage path:', storageBucket, storagePath);
 
-  // 4) Préparer le contenu à uploader (web vs mobile)
-  let uploadBody: Blob | Uint8Array;
-
+  // WEB : upload via supabase-js (OK)
   if (Platform.OS === 'web') {
     const response = await fetch(file.uri);
-    uploadBody = await response.blob();
+    const uploadBody = await response.blob();
+
+    const { error: uploadError } = await supabase.storage
+      .from(storageBucket)
+      .upload(storagePath, uploadBody, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.log('UPLOAD ERROR (web):', uploadError);
+      throw uploadError;
+    }
   } else {
-    const base64 = await FileSystem.readAsStringAsync(file.uri, {
-      // "EncodingType" n'existe pas toujours dans les types => on met 'base64'
-      encoding: 'base64' as any,
+    // MOBILE : uploadAsync natif (évite fetch(file://...) qui casse sur Android)
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !anonKey) {
+      throw new Error(
+        'Variables Supabase manquantes (EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY)',
+      );
+    }
+
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error('Pas de session Supabase');
+
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/${storageBucket}/${storagePath}`;
+
+    const uploadResult = await FileSystem.uploadAsync(uploadUrl, file.uri, {
+      httpMethod: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: anonKey,
+        'Content-Type': mimeType,
+        'x-upsert': 'false',
+      },
+      // ✅ pas de uploadType : compatible avec les typings expo-file-system actuels
     });
 
-    uploadBody = base64ToUint8Array(base64);
-  }
-  console.log('uploading to:', storageBucket, storagePath);
-  // 5) Upload Storage
-  const { error: uploadError } = await supabase.storage
-    .from(storageBucket)
-    .upload(storagePath, uploadBody, {
-      contentType: mimeType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.log('UPLOAD ERROR:', uploadError);
-    throw uploadError;
+    if (uploadResult.status !== 200) {
+      console.log('UPLOAD RESULT STATUS:', uploadResult.status);
+      console.log('UPLOAD RESULT BODY:', uploadResult.body);
+      throw new Error('Upload échoué (mobile)');
+    }
   }
 
-  // 6) Insert DB (table items)
+  // DB insert
   const { error: dbError } = await supabase.from('items').insert({
     patient_id: user.id,
     type,

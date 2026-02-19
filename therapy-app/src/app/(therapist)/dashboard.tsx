@@ -16,6 +16,8 @@ import { colors } from '../../constants';
 import DashboardSectionCard from '../../components/dashboard/DashboardSectionCard';
 import { supabase } from '../../lib/supabase';
 
+import { useDisplayName } from '../../hooks/useDisplayName';
+
 export default function TherapistDashboardPage() {
   const router = useRouter();
   const isWeb = Platform.OS === 'web';
@@ -24,7 +26,8 @@ export default function TherapistDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [searchValue, setSearchValue] = useState('');
-  const [displayName, setDisplayName] = useState<string>('');
+
+  const { displayName } = useDisplayName(); // nom complet
 
   function handleSearchChange(textValue: string) {
     setSearchValue(textValue);
@@ -38,24 +41,6 @@ export default function TherapistDashboardPage() {
         patientName,
       },
     } as any);
-  }
-
-  async function loadDisplayName() {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) return;
-
-    const { data } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', userData.user.id)
-      .maybeSingle();
-
-    if (data?.display_name) {
-      const raw = String(data.display_name).trim();
-      if (raw.length > 0) {
-        setDisplayName(raw);
-      }
-    }
   }
 
   async function loadPatients() {
@@ -106,7 +91,6 @@ export default function TherapistDashboardPage() {
   }
 
   useEffect(() => {
-    loadDisplayName();
     loadPatients();
   }, []);
 
@@ -139,7 +123,7 @@ export default function TherapistDashboardPage() {
         {/* HEADER (même esprit que patient) */}
         <View style={{ gap: 16 }}>
           <Image
-            source={require('../../assets/images/therapy-dashboard-little.svg')}
+            source={require('../../assets/images/therapy-dashboard-little.png')}
             style={{ width: 180, height: 42 }}
             resizeMode="contain"
           />
@@ -188,7 +172,7 @@ export default function TherapistDashboardPage() {
                   const patientId = String(r.patient_id);
 
                   const rawName = r?.patient_profile?.display_name;
-                  const displayName =
+                  const patientDisplayName =
                     typeof rawName === 'string' && rawName.trim().length > 0
                       ? rawName.trim()
                       : 'Patient';
@@ -196,7 +180,7 @@ export default function TherapistDashboardPage() {
                   return (
                     <Pressable
                       key={String(r.id)}
-                      onPress={() => openPatient(patientId, displayName)}
+                      onPress={() => openPatient(patientId, patientDisplayName)}
                       style={{
                         padding: 12,
                         borderWidth: 1,
@@ -221,7 +205,7 @@ export default function TherapistDashboardPage() {
                         <Text
                           style={{ color: colors.primary, fontWeight: '800' }}
                         >
-                          {displayName.slice(0, 1).toUpperCase()}
+                          {patientDisplayName.slice(0, 1).toUpperCase()}
                         </Text>
                       </View>
 
@@ -234,7 +218,7 @@ export default function TherapistDashboardPage() {
                           numberOfLines={1}
                           ellipsizeMode="tail"
                         >
-                          {displayName}
+                          {patientDisplayName}
                         </Text>
 
                         <Text

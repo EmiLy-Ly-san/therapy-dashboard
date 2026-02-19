@@ -8,15 +8,16 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Text, View, ActivityIndicator, Linking } from 'react-native';
+import { Text, View, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 
-import { Screen, Button } from '../../../../components/ui';
+import { Screen } from '../../../../components/ui';
 import { colors } from '../../../../constants';
 import { supabase } from '../../../../lib/supabase';
 
 import LibraryItemCard from '../../../../components/library/LibraryItemCard';
+import { getSignedUrl } from '../../../../lib/storageUrls';
+import PageHeader from '../../../../components/common/PageHeader';
 
 function getTypeValue(item: any) {
   return String(item?.type || '');
@@ -35,19 +36,6 @@ export default function TherapistPatientLibraryPage() {
     router.back();
   }
 
-  async function openFileItem(item: any) {
-    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-    const path = item.storage_path ? String(item.storage_path) : '';
-    if (!bucket || !path) return;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 10);
-
-    if (error) return;
-    if (data?.signedUrl) await Linking.openURL(data.signedUrl);
-  }
-
   async function buildThumbs(list: any[]) {
     const next: Record<string, string> = {};
 
@@ -55,16 +43,13 @@ export default function TherapistPatientLibraryPage() {
       const typeValue = getTypeValue(it);
       if (typeValue !== 'photo') continue;
 
-      const bucket = it.storage_bucket ? String(it.storage_bucket) : '';
-      const path = it.storage_path ? String(it.storage_path) : '';
+      const bucket = it?.storage_bucket ? String(it.storage_bucket) : '';
+      const path = it?.storage_path ? String(it.storage_path) : '';
       if (!bucket || !path) continue;
 
       try {
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(path, 60 * 10);
-
-        if (!error && data?.signedUrl) next[String(it.id)] = data.signedUrl;
+        const signedUrl = await getSignedUrl(bucket, path);
+        if (signedUrl) next[String(it.id)] = signedUrl;
       } catch (e) {
         console.log('thumb error', e);
       }
@@ -86,19 +71,34 @@ export default function TherapistPatientLibraryPage() {
 
       const pid = String(patientId);
 
-      // On récupère uniquement les items partagés (via item_shares) pour ce patient
-      // NB: la RLS limite deja au therapist connecté
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !userData?.user) {
+        setErrorMessage("Tu n'es pas connecté(e).");
+        setIsLoading(false);
+        return;
+      }
+
+      const therapistId = userData.user.id;
+
       const { data, error } = await supabase
-        .from('items')
+        .from('item_shares')
         .select(
-          'id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type',
+          `
+          item:items (
+            id, type, title, text_content, created_at, storage_bucket, storage_path, mime_type, patient_id
+          )
+        `,
         )
-        .eq('patient_id', pid)
-        .order('created_at', { ascending: false });
+        .eq('therapist_id', therapistId)
+        .is('revoked_at', null)
+        .eq('item.patient_id', pid)
+        .order('shared_at', { ascending: false });
 
       if (error) throw error;
 
-      const list = data ?? [];
+      const list = (data ?? []).map((r: any) => r.item).filter(Boolean);
 
       setItems(list);
       await buildThumbs(list);
@@ -117,46 +117,12 @@ export default function TherapistPatientLibraryPage() {
   return (
     <Screen maxWidth={720}>
       <View style={{ width: '100%', alignSelf: 'center', gap: 24 }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#EEF2FF',
-              }}
-            >
-              <Feather name="share-2" size={18} color={colors.primary} />
-            </View>
-
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '800',
-                color: colors.textPrimary,
-              }}
-            >
-              Contenus partagés
-            </Text>
-          </View>
-
-          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-        </View>
-
-        <Text style={{ marginTop: -8, color: colors.textSecondary }}>
-          Contenus partagés par le patient.
-        </Text>
+        <PageHeader
+          title="Contenus partagés"
+          iconName="share-2"
+          onBack={handleBackPress}
+          subtitle="Contenus partagés par le patient."
+        />
 
         {errorMessage.length > 0 ? (
           <Text style={{ marginTop: 12, color: colors.danger }}>
@@ -176,14 +142,10 @@ export default function TherapistPatientLibraryPage() {
               </Text>
             ) : (
               items.map((item) => {
-                const typeValue = getTypeValue(item);
-
                 const onPress = () => {
-                  if (typeValue === 'text' || typeValue === 'photo') {
-                    router.push(`/(therapist)/item/${item.id}` as any);
-                  } else {
-                    openFileItem(item);
-                  }
+                  // Unifie l'expérience : TOUS les types ouvrent la page détail therapist
+                  // (audio/vidéo seront lus dans la page détail avec expo-video)
+                  router.push(`/(therapist)/item/${item.id}` as any);
                 };
 
                 return (

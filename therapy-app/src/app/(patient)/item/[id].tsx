@@ -1,267 +1,170 @@
-import { useEffect, useState } from 'react';
 import {
-  View,
   Text,
+  View,
   TextInput,
   Pressable,
   Switch,
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 
 import { Screen, Card, Button } from '../../../components/ui';
 import { colors } from '../../../constants';
-import { supabase } from '../../../lib/supabase';
 
 import PhotoPreview from '../../../components/item/PhotoPreview';
 import ItemNotesSection from '../../../components/item/ItemNotesSection';
+import PageHeader from '../../../components/common/PageHeader';
+
+import { useItemShare } from '../../../hooks/useItemShare';
+import { usePatientItem } from '../../../hooks/usePatientItem';
+
+import { useEffect, useMemo, useState } from 'react';
+import { getSignedUrl } from '../../../lib/storageUrls';
+
+// ✅ expo-video (SDK 54)
+import { VideoView, useVideoPlayer } from 'expo-video';
+
+function getExt(path?: string | null) {
+  if (!path) return '';
+  const clean = String(path).split('?')[0];
+  const parts = clean.split('.');
+  return parts.length > 1 ? String(parts.pop() || '').toLowerCase() : '';
+}
+
+function inferTypeFromMimeOrExt(mime?: string | null, path?: string | null) {
+  const m = String(mime || '').toLowerCase();
+
+  // ✅ priorité au mime
+  if (m.startsWith('video/')) return 'video';
+  if (m.startsWith('audio/')) return 'audio';
+  if (m.startsWith('image/')) return 'photo';
+
+  // ✅ fallback extension
+  const ext = getExt(path);
+  if (['mp4', 'mov', 'm4v', 'webm'].includes(ext)) return 'video';
+  if (['mp3', 'm4a', 'aac', 'wav', 'ogg'].includes(ext)) return 'audio';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext))
+    return 'photo';
+
+  return 'file';
+}
 
 export default function ItemDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const itemId = id ? String(id) : null;
 
-  const [item, setItem] = useState<any>(null);
-  const [textValue, setTextValue] = useState('');
-  const [titleValue, setTitleValue] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  // Data item (load/save/delete)
+  const {
+    item,
+    isText,
+    isPhoto,
+    titleValue,
+    setTitleValue,
+    textValue,
+    setTextValue,
+    isLoading,
+    isSaving,
+    isDeleting,
+    errorMessage,
+    saveText,
+    deleteItem,
+  } = usePatientItem(itemId);
 
-  // Ajout : toggle Partager avec le thérapeute
-  const [therapistId, setTherapistId] = useState<string | null>(null);
-  const [isShared, setIsShared] = useState(false);
-  const [isTogglingShare, setIsTogglingShare] = useState(false);
+  // Toggle partage vers thérapeute
+  const {
+    therapistId,
+    isShared,
+    isTogglingShare,
+    errorMessage: shareErrorMessage,
+    setShareEnabled,
+  } = useItemShare(itemId);
+
+  // ✅ Signed URL pour media
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [isMediaLoading, setIsMediaLoading] = useState(false);
+
+  // ✅ Type fiable : on préfère TOUJOURS mime/ext à item.type
+  const effectiveType = useMemo(() => {
+    if (!item) return null;
+
+    const inferred = inferTypeFromMimeOrExt(item.mime_type, item.storage_path);
+    if (inferred !== 'file') return inferred;
+
+    // fallback sur la DB si on ne sait pas
+    const dbType = String(item.type || '');
+    if (
+      dbType === 'text' ||
+      dbType === 'photo' ||
+      dbType === 'audio' ||
+      dbType === 'video'
+    ) {
+      return dbType;
+    }
+
+    return 'file';
+  }, [item]);
+
+  // Reset media quand on change d'item
+  useEffect(() => {
+    setMediaUrl(null);
+    setIsMediaLoading(false);
+  }, [itemId]);
+
+  // charge signed url si audio/vidéo
+  useEffect(() => {
+    let canceled = false;
+
+    async function loadMedia() {
+      if (!item) return;
+      if (effectiveType !== 'audio' && effectiveType !== 'video') return;
+
+      const bucket = item.storage_bucket;
+      const path = item.storage_path;
+
+      if (!bucket || !path) {
+        if (!canceled) setMediaUrl(null);
+        return;
+      }
+
+      try {
+        if (!canceled) setIsMediaLoading(true);
+        const signed = await getSignedUrl(bucket, path, 60 * 10);
+        if (!canceled) setMediaUrl(signed || null);
+      } catch (e) {
+        console.log('media url error', e);
+        if (!canceled) setMediaUrl(null);
+      } finally {
+        if (!canceled) setIsMediaLoading(false);
+      }
+    }
+
+    loadMedia();
+
+    return () => {
+      canceled = true;
+    };
+  }, [item, effectiveType]);
+
+  // Player expo-video (hook toujours appelé)
+  const player = useVideoPlayer(mediaUrl || '', (p) => {
+    p.loop = false;
+  });
 
   function handleBackPress() {
     // Retour stable vers la library
     router.replace('/(patient)/library' as any);
   }
 
-  // Ajout : récupère therapist_id actif
-  async function fetchTherapistId() {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData?.user) return null;
-
-    const userId = userData.user.id;
-
-    const { data, error } = await supabase
-      .from('therapist_patients')
-      .select('therapist_id')
-      .eq('patient_id', userId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data?.therapist_id ? String(data.therapist_id) : null;
-  }
-
-  async function refreshShareState(itemId: string, tid: string | null) {
-    if (!tid) {
-      setIsShared(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('item_shares')
-      .select('id')
-      .eq('item_id', itemId)
-      .eq('therapist_id', tid)
-      .is('revoked_at', null)
-      .limit(1);
-
-    if (error) throw error;
-    setIsShared((data ?? []).length > 0);
-  }
-
-  // Ajout : applique la valeur du toggle
-  async function setShareEnabled(itemId: string, enabled: boolean) {
-    setIsTogglingShare(true);
-    setErrorMessage('');
-
-    try {
-      let tid = therapistId;
-      if (!tid) {
-        tid = await fetchTherapistId();
-        setTherapistId(tid);
-      }
-
-      if (!tid) {
-        setErrorMessage("Aucun thérapeute actif n'est lié à ce patient.");
-        // On remet l’état UI cohérent
-        setIsShared(false);
-        return;
-      }
-
-      if (enabled) {
-        const { error } = await supabase.from('item_shares').upsert(
-          {
-            item_id: itemId,
-            therapist_id: tid,
-            shared_at: new Date().toISOString(),
-            revoked_at: null,
-          },
-          { onConflict: 'item_id,therapist_id' },
-        );
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('item_shares')
-          .update({ revoked_at: new Date().toISOString() })
-          .eq('item_id', itemId)
-          .eq('therapist_id', tid)
-          .is('revoked_at', null);
-
-        if (error) throw error;
-      }
-
-      await refreshShareState(itemId, tid);
-    } catch (e: any) {
-      console.log('TOGGLE SHARE DETAIL ERROR', e);
-      setErrorMessage(e?.message ?? JSON.stringify(e));
-    } finally {
-      setIsTogglingShare(false);
-    }
-  }
-
-  async function loadItem() {
-    setErrorMessage('');
-
-    if (!id) {
-      setErrorMessage("ID manquant (impossible d'ouvrir l'item).");
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    setItem(data);
-
-    if (data?.type === 'text') {
-      setTextValue(data.text_content || '');
-      setTitleValue(data.title || '');
-    } else {
-      setTextValue('');
-      setTitleValue('');
-    }
-
-    //  charge l’état du partage
-    try {
-      const tid = await fetchTherapistId();
-      setTherapistId(tid);
-      await refreshShareState(String(id), tid);
-    } catch (e) {
-      console.log('share state load error', e);
-    }
-
-    setIsLoading(false);
-  }
-
   async function handleSavePress() {
-    if (!id) {
-      setErrorMessage("ID manquant (impossible d'enregistrer).");
-      return;
-    }
-
-    if (!item || item.type !== 'text') {
-      setErrorMessage("Cet item n'est pas un texte.");
-      return;
-    }
-
-    setIsSaving(true);
-    setErrorMessage('');
-
-    const cleanTitle = titleValue.trim();
-    const cleanText = textValue.trim();
-
-    if (cleanText.length === 0) {
-      setIsSaving(false);
-      setErrorMessage('Le texte ne peut pas être vide.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('items')
-      .update({
-        title: cleanTitle.length > 0 ? cleanTitle : null,
-        text_content: cleanText,
-      })
-      .eq('id', id);
-
-    setIsSaving(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-
-    handleBackPress();
+    const ok = await saveText();
+    if (ok) handleBackPress();
   }
 
-  async function deleteItem() {
-    if (!id || !item) return;
-
-    try {
-      setIsDeleting(true);
-      setErrorMessage('');
-
-      // 1) supprimer les notes liées à cet item
-      const { error: notesError } = await supabase
-        .from('item_notes')
-        .delete()
-        .eq('item_id', id);
-
-      if (notesError) throw notesError;
-
-      // 2) supprimer le fichier storage s'il existe
-      const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-      const path = item.storage_path ? String(item.storage_path) : '';
-
-      if (bucket && path) {
-        const { error: storageError } = await supabase.storage
-          .from(bucket)
-          .remove([path]);
-
-        if (storageError) throw storageError;
-      }
-
-      // 3) supprimer l'item
-      // (avec ON DELETE CASCADE côté DB, item_shares sera supprimé automatiquement)
-      const { error: itemError } = await supabase
-        .from('items')
-        .delete()
-        .eq('id', id);
-
-      if (itemError) throw itemError;
-
-      handleBackPress();
-    } catch (e: any) {
-      console.log('DELETE ITEM ERROR', e);
-      setErrorMessage(e?.message ?? JSON.stringify(e));
-    } finally {
-      setIsDeleting(false);
-    }
+  async function handleDeletePress() {
+    const ok = await deleteItem();
+    if (ok) handleBackPress();
   }
-
-  useEffect(() => {
-    loadItem();
-  }, [id]);
 
   if (isLoading) {
     return (
@@ -285,52 +188,37 @@ export default function ItemDetailPage() {
     );
   }
 
-  const typeValue = String(item.type || '');
-  const isText = typeValue === 'text';
-  const isPhoto = typeValue === 'photo';
+  // ✅ Empêche d'afficher un "ancien item" pendant le chargement du nouvel ID
+  const currentId = itemId ? String(itemId) : null;
+  const loadedId = item?.id != null ? String(item.id) : null;
+
+  if (currentId && loadedId && loadedId !== currentId) {
+    return (
+      <Screen centered>
+        <ActivityIndicator />
+      </Screen>
+    );
+  }
 
   return (
     <Screen centered maxWidth={720}>
-      {/* HEADER */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#EEF2FF',
-            }}
-          >
-            <Feather name="file-text" size={18} color={colors.primary} />
-          </View>
+      <PageHeader
+        title="Détail"
+        iconName="file-text"
+        onBack={handleBackPress}
+      />
 
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: '800',
-              color: colors.textPrimary,
-            }}
-          >
-            Détail
-          </Text>
-        </View>
-
-        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-      </View>
-
+      {/* Erreurs item */}
       {errorMessage.length > 0 ? (
         <Text style={{ marginTop: 10, color: colors.danger }}>
           {errorMessage}
+        </Text>
+      ) : null}
+
+      {/* Erreurs partage */}
+      {shareErrorMessage.length > 0 ? (
+        <Text style={{ marginTop: 10, color: colors.danger }}>
+          {shareErrorMessage}
         </Text>
       ) : null}
 
@@ -362,17 +250,73 @@ export default function ItemDetailPage() {
 
         <Switch
           value={isShared}
-          onValueChange={(v) => {
-            if (!id) return;
-            setIsShared(v); // feedback immédiat
-            setShareEnabled(String(id), v);
-          }}
-          disabled={isTogglingShare || !id}
+          onValueChange={(v) => setShareEnabled(v)}
+          disabled={isTogglingShare || !itemId}
         />
       </View>
 
+      {/* VIDEO */}
+      {effectiveType === 'video' ? (
+        <Card style={{ marginTop: 16 }}>
+          {isMediaLoading ? (
+            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+              <ActivityIndicator />
+              <Text
+                style={{
+                  marginTop: 10,
+                  color: colors.textSecondary,
+                  fontWeight: '600',
+                }}
+              >
+                Chargement vidéo…
+              </Text>
+            </View>
+          ) : mediaUrl ? (
+            <VideoView
+              player={player}
+              nativeControls
+              style={{ width: '100%', height: 240, borderRadius: 12 }}
+            />
+          ) : (
+            <Text style={{ color: colors.danger }}>
+              Impossible de charger la vidéo.
+            </Text>
+          )}
+        </Card>
+      ) : null}
+
+      {/* AUDIO (simple : contrôles natifs, sans image) */}
+      {effectiveType === 'audio' ? (
+        <Card style={{ marginTop: 16 }}>
+          {isMediaLoading ? (
+            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+              <ActivityIndicator />
+              <Text
+                style={{
+                  marginTop: 10,
+                  color: colors.textSecondary,
+                  fontWeight: '600',
+                }}
+              >
+                Chargement audio…
+              </Text>
+            </View>
+          ) : mediaUrl ? (
+            <VideoView
+              player={player}
+              nativeControls
+              style={{ width: '100%', height: 80, borderRadius: 12 }}
+            />
+          ) : (
+            <Text style={{ color: colors.danger }}>
+              Impossible de charger l’audio.
+            </Text>
+          )}
+        </Card>
+      ) : null}
+
       {/* PHOTO */}
-      {isPhoto ? (
+      {effectiveType === 'photo' ? (
         <PhotoPreview bucket={item.storage_bucket} path={item.storage_path} />
       ) : null}
 
@@ -414,12 +358,12 @@ export default function ItemDetailPage() {
       ) : null}
 
       {/* NOTES */}
-      <ItemNotesSection itemId={String(id)} />
+      <ItemNotesSection itemId={String(itemId)} />
 
       {/* SUPPRIMER ITEM : bouton léger rouge (outline) */}
       <View style={{ marginTop: 18 }}>
         <Pressable
-          onPress={deleteItem}
+          onPress={handleDeletePress}
           disabled={isDeleting}
           style={{
             paddingVertical: 12,

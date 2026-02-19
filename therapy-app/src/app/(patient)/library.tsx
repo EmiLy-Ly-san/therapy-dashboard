@@ -12,25 +12,19 @@
  */
 
 import { useEffect, useState } from 'react';
-import {
-  Text,
-  View,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
-import { supabase } from '../../lib/supabase';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
 import { usePatientItems, FilterType } from '../../hooks/usePatientItems';
+import PageHeader from '../../components/common/PageHeader';
 
 export default function PatientLibraryPage() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const [filterType, setFilterType] = useState<FilterType>('all');
 
@@ -44,73 +38,50 @@ export default function PatientLibraryPage() {
     sharedByItemId,
   } = usePatientItems(filterType);
 
+  const [isUploadingFromDashboard, setIsUploadingFromDashboard] =
+    useState(false);
+
+  const shouldShowAnyLoader = isUploadingFromDashboard || shouldShowLoader;
+
   function handleBackPress() {
-    router.back();
+    // Back stable : si pas d'historique, on revient au dashboard patient
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(patient)/dashboard' as any);
   }
 
   function handleFilterPress(nextFilter: FilterType) {
     setFilterType(nextFilter);
   }
 
-  async function openFileItem(item: any) {
-    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-    const path = item.storage_path ? String(item.storage_path) : '';
-    if (!bucket || !path) return;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 10);
-
-    if (error) return;
-    if (data?.signedUrl) await Linking.openURL(data.signedUrl);
-  }
-
   useEffect(() => {
     loadItems('initial');
   }, []);
 
+  useEffect(() => {
+    if (String(params.uploading ?? '') === '1') {
+      setIsUploadingFromDashboard(true);
+      loadItems('refresh');
+      router.setParams({ uploading: undefined } as any);
+    }
+  }, [params.uploading]);
+
+  useEffect(() => {
+    if (!isBusy && isUploadingFromDashboard) {
+      setIsUploadingFromDashboard(false);
+    }
+  }, [isBusy]);
+
   return (
     <Screen maxWidth={720}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#EEF2FF',
-            }}
-          >
-            <Feather name="book-open" size={18} color={colors.primary} />
-          </View>
-
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: '800',
-              color: colors.textPrimary,
-            }}
-          >
-            Mes contenus
-          </Text>
-        </View>
-
-        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-      </View>
-
-      <Text style={{ marginTop: 6, color: colors.textSecondary }}>
-        Tous tes textes et fichiers, au même endroit.
-      </Text>
+      <PageHeader
+        title="Mes contenus"
+        iconName="book-open"
+        onBack={handleBackPress}
+        subtitle="Tous tes textes et fichiers, au même endroit."
+      />
 
       {/* Filtres */}
       <View
@@ -159,35 +130,34 @@ export default function PatientLibraryPage() {
       ) : null}
 
       {/* Loader */}
-      {shouldShowLoader ? (
+      {shouldShowAnyLoader ? (
         <View style={{ marginTop: 24, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
+          {isUploadingFromDashboard ? (
+            <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+              Upload en cours…
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
       {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
-        {!shouldShowLoader &&
+        {!shouldShowAnyLoader &&
           visibleItems.map((item) => {
-            const typeValue = String(item.type || '');
-            const itemId = String(item.id);
-
             const onPress = () => {
-              if (typeValue === 'text' || typeValue === 'photo') {
-                router.push(`/(patient)/item/${item.id}` as any);
-              } else {
-                openFileItem(item);
-              }
+              //  Unifie l'expérience : tous les types ouvrent la page détail
+              router.push(`/(patient)/item/${item.id}` as any);
             };
 
             return (
               <LibraryItemCard
-                key={itemId}
+                key={String(item.id)}
                 item={item}
-                thumbUrl={thumbUrls[itemId]}
+                thumbUrl={thumbUrls[String(item.id)]}
                 onPress={onPress}
                 visibilityLabel={
-                  sharedByItemId[itemId] === true ? 'Partagé' : 'Privé'
+                  sharedByItemId[String(item.id)] === true ? 'Partagé' : 'Privé'
                 }
               />
             );

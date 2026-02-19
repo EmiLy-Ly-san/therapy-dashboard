@@ -6,7 +6,7 @@ import { Screen, Card, Button } from '../../components/ui';
 import { colors } from '../../constants';
 import { supabase } from '../../lib/supabase';
 
-import { Feather } from '@expo/vector-icons';
+import PageHeader from '../../components/common/PageHeader';
 
 export default function WritePage() {
   const router = useRouter();
@@ -67,52 +67,12 @@ export default function WritePage() {
           gap: 16,
         }}
       >
-        {/* HEADER avec bouton retour */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#EEF2FF',
-              }}
-            >
-              <Feather name="edit-3" size={18} color={colors.primary} />
-            </View>
-
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: '800',
-                color: colors.textPrimary,
-              }}
-            >
-              Écrire aujourd’hui
-            </Text>
-          </View>
-
-          <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-        </View>
-
-        <Text
-          style={{
-            marginTop: -6,
-            color: colors.textSecondary,
-            lineHeight: 20,
-          }}
-        >
-          Une note privée pour déposer ce que tu ressens.
-        </Text>
+        <PageHeader
+          title="Écrire aujourd’hui"
+          iconName="edit-3"
+          onBack={handleBackPress}
+          subtitle="Une note privée pour déposer ce que tu ressens."
+        />
 
         <Card
           style={{

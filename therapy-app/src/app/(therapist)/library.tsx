@@ -3,27 +3,24 @@
  * -----------------------
  * - Liste des contenus visibles par le thérapeute
  * - Grâce à la RLS : uniquement ceux partagés par les patients
+ *
+ * Refacto :
+ * - La query passe par item_shares dans useTherapistItems()
  */
 
 import { useEffect, useState } from 'react';
-import {
-  Text,
-  View,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-} from 'react-native';
+import { Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen, Button } from '../../components/ui';
 import { colors } from '../../constants';
-import { supabase } from '../../lib/supabase';
 
 import LibraryItemCard from '../../components/library/LibraryItemCard';
 import {
   useTherapistItems,
   TherapistFilterType,
 } from '../../hooks/useTherapistItems';
+import PageHeader from '../../components/common/PageHeader';
 
 export default function TherapistLibraryPage() {
   const router = useRouter();
@@ -47,45 +44,18 @@ export default function TherapistLibraryPage() {
     setFilterType(nextFilter);
   }
 
-  async function openFileItem(item: any) {
-    const bucket = item.storage_bucket ? String(item.storage_bucket) : '';
-    const path = item.storage_path ? String(item.storage_path) : '';
-    if (!bucket || !path) return;
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, 60 * 10);
-
-    if (error) return;
-    if (data?.signedUrl) await Linking.openURL(data.signedUrl);
-  }
-
   useEffect(() => {
     loadItems('initial');
   }, []);
 
   return (
     <Screen centered maxWidth={720}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Text
-          style={{ fontSize: 26, fontWeight: '900', color: colors.textPrimary }}
-        >
-          Contenus partagés
-        </Text>
-
-        <Button title="Retour" variant="ghost" onPress={handleBackPress} />
-      </View>
-
-      <Text style={{ marginTop: 8, color: colors.textSecondary }}>
-        Uniquement les contenus partagés par les patients.
-      </Text>
+      <PageHeader
+        title="Contenus partagés"
+        iconName="book-open"
+        onBack={handleBackPress}
+        subtitle="Uniquement les contenus partagés par les patients."
+      />
 
       {/* Filtres */}
       <View
@@ -133,35 +103,28 @@ export default function TherapistLibraryPage() {
         </Text>
       ) : null}
 
-      {/* Loader */}
       {shouldShowLoader ? (
         <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
           <ActivityIndicator />
-          <Text style={{ color: colors.textSecondary }}>Chargement…</Text>
         </View>
       ) : null}
 
-      {/* Liste */}
       <View style={{ marginTop: 12, gap: 12 }}>
         {!shouldShowLoader &&
           visibleItems.map((item) => {
             const typeValue = String(item.type || '');
-            const itemId = String(item.id);
 
             const onPress = () => {
-              // texte + photo => page détail therapist (lecture)
-              if (typeValue === 'text' || typeValue === 'photo') {
-                router.push(`/(therapist)/item/${item.id}` as any);
-              } else {
-                openFileItem(item);
-              }
+              // ✅ Unifie l'expérience : tous les types ouvrent la page détail
+              // (audio/vidéo seront lus dans la page détail avec expo-video)
+              router.push(`/(therapist)/item/${item.id}` as any);
             };
 
             return (
               <LibraryItemCard
-                key={itemId}
+                key={String(item.id)}
                 item={item}
-                thumbUrl={thumbUrls[itemId]}
+                thumbUrl={thumbUrls[String(item.id)]}
                 onPress={onPress}
                 hidePrivateLabel
               />
